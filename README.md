@@ -156,49 +156,8 @@
   <img alt="Star History" src="https://api.star-history.com/svg?repos=SECTL/SecRandom&type=Date">
 </picture>
 
-## 📖 使用教程
+## 贡献指南与 Actions 构建工作流
 
-### 🚀 GitHub Actions 统一构建工作流使用指南
-
-SecRandom 项目使用统一的 GitHub Actions 工作流进行构建和发布，文件位于 `.github/workflows/build-unified.yml`。该工作流支持多种触发方式和配置选项。
-
-<details>
-<summary>查看更多信息</summary>
-
-#### 通过提交消息触发特定构建
-
-您可以通过在 git commit 消息中包含特定关键词来触发不同的构建行为：
-
-1. **触发打包构建**
-   - 在 commit 消息中包含 `打包` 关键词
-   - 例如：`git commit -m "新增功能 打包"`
-
-2. **指定构建平台**
-   - `win` - Windows 平台
-   - `linux` - Linux 平台
-   - `all` - 所有平台
-   - 例如：`git commit -m "修复bug 打包 linux"`
-
-3. **触发所有平台构建**
-   - 创建符合版本号规范的 tag（格式：`v数字.数字.数字.数字`）
-   - 例如：`git tag v1.2.3.4 && git push origin v1.2.3.4`
-
-#### 构建参数关键词说明
-
-提交消息中可以包含以下关键词来控制构建行为：
-
-| 关键词 | 含义 | 示例 |
-|--------|------|------|
-| `打包` | 通用打包触发 | `git commit -m "新增功能 打包"` |
-| `win` | Windows 平台 | `git commit -m "修复UI 打包 win"` |
-| `linux` | Linux 平台 | `git commit -m "优化性能 打包 linux"` |
-| `all` | 所有平台 | `git commit -m "大更新 打包 all"` |
-
-**组合使用示例：**
-
-- `git commit -m "优化性能 打包 pi"` - 使用 PyInstaller 构建 Windows 平台
-- `git commit -m "修复bug 打包 pi"` - 使用 PyInstaller 构建 Linux 平台
-
-</details>
+查看我们的 [贡献指南](./CONTRIBUTING.md) 来查看更多内容！
 
 **Copyright © 2025 SECTL**
