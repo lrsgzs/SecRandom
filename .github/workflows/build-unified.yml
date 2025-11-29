@@ -1,4 +1,4 @@
-name: 统一构建流程
+name: 构建流程
 
 # 环境变量
 env:
@@ -9,38 +9,8 @@ env:
 
 on:
   push:
-    branches:
-      - master
   pull_request:
-    branches:
-      - master
   workflow_dispatch:
-    inputs:
-      build_target:
-        description: '构建目标 (all/windows/linux)'
-        required: false
-        default: 'all'
-        type: choice
-        options:
-          - all
-          - windows
-          - linux
-      release:
-        description: '是否发布版本'
-        required: false
-        default: 'false'
-        type: choice
-        options:
-          - true
-          - false
-      package:
-        description: '是否打包应用'
-        required: false
-        default: 'true'
-        type: choice
-        options:
-          - true
-          - false
 
 concurrency:
   group: build-${{ github.ref }}
@@ -138,7 +108,7 @@ jobs:
         run: mkdir zip
 
       - name: 更新 version_info.txt
-        if: startsWith(github.ref_name, 'v') && contains(github.ref_name, '.') && !contains(github.ref_name, '-') && (github.event_name != 'workflow_dispatch' || inputs.package == 'true')
+        if: startsWith(github.ref_name, 'v')
         run: |
           python update_version.py
         env:
@@ -172,9 +142,7 @@ jobs:
 
       # Windows 打包操作
       - name: Windows 打包操作
-        if: |
-          matrix.platform == 'windows' &&
-          (github.event_name != 'workflow_dispatch' || inputs.package == 'true')
+        if: matrix.platform == 'windows'
         run: |
           echo "开始 Windows 打包操作..."
 
@@ -213,9 +181,7 @@ jobs:
 
       # Linux 打包操作
       - name: Linux 打包操作
-        if: |
-          matrix.platform == 'linux' &&
-          (github.event_name != 'workflow_dispatch' || inputs.package == 'true')
+        if: matrix.platform == 'linux'
         run: |
           echo "开始 Linux 打包操作..."
 
@@ -254,9 +220,7 @@ jobs:
           echo "目录模式打包完成: zip/SecRandom-${{ matrix.platform }}-${{ github.ref_name }}-${{ matrix.arch }}-${{ matrix.pack_mode }}.zip"
 
       - name: 上传应用程序
-        if: |
-          github.event_name != 'pull_request' &&
-          (github.event_name != 'workflow_dispatch' || inputs.package == 'true')
+        if: github.event_name != 'pull_request'
         uses: actions/upload-artifact@v4.4.2
         with:
           name: ${{ matrix.platform }}-${{ matrix.arch }}-${{ matrix.pack_mode }}
@@ -265,26 +229,11 @@ jobs:
 
   release:
     needs: [builder_matrix]
-    if: |
-      (startsWith(github.ref, 'refs/tags/v') &&
-      contains(github.ref_name, '.') &&
-      (github.event_name != 'workflow_dispatch' || inputs.release == 'true')) ||
-      (github.event_name == 'workflow_dispatch' && inputs.release == 'true')
+    if: ${{startsWith(github.ref, 'refs/tags/')}}
     runs-on: ubuntu-latest
     permissions:
       contents: write
     steps:
-      - name: 安全检查
-        run: |
-          echo "执行安全检查..."
-          # 检查敏感文件
-          if [ -f ".env" ]; then
-            echo "警告: 发现 .env 文件，请检查是否包含敏感信息"
-          fi
-          # 检查文件权限
-          find . -type f -name "*.py" -perm /002 -exec echo "警告: {} 文件权限过于宽松" \; 2>/dev/null || true
-          echo "安全检查完成"
-
       - name: 检出仓库
         uses: actions/checkout@v4.2.2
         with:
