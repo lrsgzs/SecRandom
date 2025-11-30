@@ -1,7 +1,13 @@
 # 个性设置页面的语言文件
 
 custom_settings = {
-    "ZH_CN": {"title": {"name": "个性设置", "description": "个性化设置选项"}}
+    "ZH_CN": {"title": {"name": "个性设置", "description": "个性化设置选项"}},
+    "EN_US": {
+        "title": {
+            "name": "Profile settings",
+            "description": "Profile settings",
+        },
+    },
 }
 
 # 页面管理语言配置

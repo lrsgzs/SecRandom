@@ -280,9 +280,10 @@ def get_content_switchbutton_name(
     if first_level_key in Language:
         if second_level_key in Language[first_level_key]:
             # logger.debug(f"获取内容文本项开关按钮名称: {first_level_key}.{second_level_key}")
-            return Language[first_level_key][second_level_key]["switchbutton_name"][
-                is_enable
-            ]
+            item = Language[first_level_key][second_level_key]
+            switchbutton = item.get("switchbutton_name")
+            if switchbutton is not None:
+                return switchbutton.get(is_enable)
     return None
 
 
@@ -294,12 +295,22 @@ def get_content_combo_name(first_level_key: str, second_level_key: str):
         second_level_key: 第二层的键
 
     Returns:
-        内容文本项的下拉框内容，如果不存在则返回None
+        内容文本项的下拉框内容（列表格式），如果不存在则返回None
     """
     if first_level_key in Language:
         if second_level_key in Language[first_level_key]:
             # logger.debug(f"获取内容文本项下拉框内容: {first_level_key}.{second_level_key}")
-            return Language[first_level_key][second_level_key]["combo_items"]
+            combo_items = Language[first_level_key][second_level_key].get("combo_items")
+            # 如果是字典格式（如 {"0": "Item1", "1": "Item2"}），转换为列表
+            if isinstance(combo_items, dict):
+                # 按数字键排序并返回值列表
+                try:
+                    sorted_keys = sorted(combo_items.keys(), key=lambda x: int(x))
+                    return [combo_items[k] for k in sorted_keys]
+                except (ValueError, TypeError):
+                    # 如果键不是数字，按原顺序返回值
+                    return list(combo_items.values())
+            return combo_items
     return None
 
 

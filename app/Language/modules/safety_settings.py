@@ -149,5 +149,254 @@ basic_safety_settings = {
             "description": "启用后导入版本不匹配时需验证",
             "switchbutton_name": {"enable": "", "disable": ""},
         },
-    }
+    },
+    "EN_US": {
+        "title": {
+            "name": "Basic security settings",
+            "description": "配置基础安全验证功能",
+        },
+        "verification_method": {
+            "name": "Verification method",
+            "description": "配置安全功能验证方式",
+        },
+        "verification_process": {
+            "name": "Verification process",
+            "description": "选择安全验证组合方式",
+            "combo_items": {
+                "0": "单步验证（任选一种方式）",
+                "1": "Password only",
+                "2": "TOTP only",
+                "3": "USB drives only",
+                "4": "Password + TOTP",
+                "5": "Password + USB drives",
+                "6": "TOTP + USB drives",
+                "7": "Password + TOTP + USB drives",
+            },
+        },
+        "security_operations": {
+            "name": "Security operations",
+            "description": "配置需要安全验证的操作",
+        },
+        "safety_switch": {
+            "name": "Safety switch",
+            "description": "启用后所有安全操作都需要验证密码",
+        },
+        "set_password": {
+            "name": "Set password",
+            "description": "设置或修改安全验证密码",
+        },
+        "totp_switch": {
+            "name": "TOTP verification",
+            "description": "启用后可在安全操作中使用TOTP动态口令",
+        },
+        "set_totp": {
+            "name": "Set TOTP",
+            "description": "配置TOTP动态口令验证",
+        },
+        "usb_switch": {
+            "name": "USB drive verification",
+            "description": "启用后可在安全操作中使用U盘验证",
+        },
+        "bind_usb": {
+            "name": "Bind USB drive",
+            "description": "绑定用于验证的U盘设备",
+        },
+        "unbind_usb": {
+            "name": "Unbind USB drive",
+            "description": "解除U盘设备绑定",
+        },
+        "show_hide_floating_window_switch": {
+            "name": "显示/隐藏浮窗验证",
+            "description": "启用后显示或隐藏浮窗时需要安全验证",
+        },
+        "restart_switch": {
+            "name": "重启验证",
+            "description": "启用后重启软件时需要安全验证",
+        },
+        "exit_switch": {
+            "name": "退出验证",
+            "description": "启用后退出软件时需要安全验证",
+        },
+        "password_rules": {
+            "name": "Password Requirements",
+            "description": "Length > 8, with at least two categories of letters, numbers, and special characters (recommended three categories)",
+        },
+        "current_password": {
+            "name": "Current password",
+        },
+        "password_input_placeholder": {
+            "name": "Enter password to verify",
+        },
+        "new_password": {
+            "name": "New password",
+        },
+        "confirm_password": {
+            "name": "Confirm New Password",
+        },
+        "password_strength_title": {
+            "name": "Password intensity",
+        },
+        "strength_weak": {
+            "name": "Weak",
+        },
+        "strength_medium": {
+            "name": "Mid",
+        },
+        "strength_strong": {
+            "name": "strong",
+        },
+        "save_button": {
+            "name": "Save",
+        },
+        "cancel_button": {
+            "name": "Cancel",
+        },
+        "error_current_password": {
+            "name": "Current password is incorrect",
+        },
+        "error_mismatch": {
+            "name": "New password does not match confirmation",
+        },
+        "error_strength_insufficient": {
+            "name": "Not enough password",
+        },
+        "success_updated": {
+            "name": "Password updated",
+        },
+        "remove_password": {
+            "name": "Remove password",
+            "description": "Cancel current security verification password",
+        },
+        "remove_password_confirm_title": {
+            "name": "Confirm Password Removal",
+        },
+        "remove_password_confirm_content": {
+            "name": "Removing passwords will disable secure switches, continue?",
+        },
+        "remove_password_success": {
+            "name": "Password removed and security switch closed",
+        },
+        "error_title": {
+            "name": "Error",
+        },
+        "dialog_yes_text": {
+            "name": "OK",
+        },
+        "dialog_cancel_text": {
+            "name": "Cancel",
+        },
+        "generate_totp_secret": {
+            "name": "Generate key",
+        },
+        "verify_totp_code": {
+            "name": "Verify CAPTCHA",
+        },
+        "totp_input_placeholder": {
+            "name": "Enter TOTP verification code to verify",
+        },
+        "totp_secret_prefix": {
+            "name": "Key",
+        },
+        "totp_uri_prefix": {
+            "name": "URI",
+        },
+        "totp_generated_saved": {
+            "name": "Generated and saved TOTP key",
+        },
+        "totp_generated_error": {
+            "name": "Failed to generate TOTP",
+        },
+        "totp_code_valid": {
+            "name": "Captcha is valid",
+        },
+        "totp_code_invalid": {
+            "name": "Invalid verification code",
+        },
+        "totp_save_success": {
+            "name": "Settings saved",
+        },
+        "totp_verify_before_save": {
+            "name": "Please verify the code before saving",
+        },
+        "totp_qr_unavailable": {
+            "name": "Failed to display QR code, please install QR library",
+        },
+        "usb_refresh": {
+            "name": "Refresh",
+        },
+        "usb_bind": {
+            "name": "Bind",
+        },
+        "usb_unbind_all": {
+            "name": "Unbind All",
+        },
+        "usb_no_removable": {
+            "name": "No removable disk detected",
+        },
+        "usb_bind_success": {
+            "name": "Bind Up",
+        },
+        "usb_unbind_all_success": {
+            "name": "Unbound all Ups",
+        },
+        "usb_require_key_file": {
+            "name": ".key file verification required",
+        },
+        "totp_secret_generated": {
+            "name": "Key generated, please complete validation before saving",
+        },
+        "error_set_password_first": {
+            "name": "Please set password first",
+        },
+        "error_set_totp_first": {
+            "name": "Please set TOTP first",
+        },
+        "error_bind_usb_first": {
+            "name": "Please bind to a disk first",
+        },
+        "verify_in_progress": {
+            "name": "Verifying,please wait",
+        },
+        "verify_failed_generic": {
+            "name": "Verification not passed, please check input",
+        },
+        "usb_unbind_selected": {
+            "name": "Unbind",
+        },
+        "usb_unbind_selected_success": {
+            "name": "Untied Upad",
+        },
+        "usb_select_bound_hint": {
+            "name": "Please select a bound device",
+        },
+        "usb_bound_devices": {
+            "name": "Bind Device",
+        },
+        "usb_status_connected": {
+            "name": "U Connected",
+        },
+        "usb_status_disconnected": {
+            "name": "U not connected",
+        },
+        "open_settings_switch": {
+            "name": "Open settings validation",
+            "description": "Secure authentication is required when opening settings",
+        },
+        "diagnostic_export_switch": {
+            "name": "Diagnostic Data Export Validation",
+            "description": "Secure validation to export diagnostic data when enabled",
+        },
+        "data_export_switch": {
+            "name": "Data Export Validation",
+            "description": "Secure verification before all data are exported when enabled",
+        },
+        "import_overwrite_switch": {
+            "name": "Import Overwrite Verification",
+            "description": "Authentication is required to overwrite existing files after import",
+        },
+        "import_version_mismatch_switch": {
+            "name": "Version mismatch import validation",
+            "description": "Authentication is required for importing versions when they do not match",
+        },
+    },
 }

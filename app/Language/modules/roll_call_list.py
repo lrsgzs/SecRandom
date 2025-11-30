@@ -463,6 +463,144 @@ gender_setting = {
             "description": "删除性别选项提示内容",
         },
     },
+    "EN_US": {
+        "title": {
+            "name": "Gender settings",
+            "description": "设置性别窗口标题",
+        },
+        "description": {
+            "name": "在此窗口中，您可以设置学生性别\n每行输入一个性别，系统会将其存储到班级名单文件中\n\n请每行只输入一个性别，例如：\n男\n女\n其他",
+            "description": "性别设置窗口描述",
+        },
+        "input_title": {
+            "name": "Gender list",
+            "description": "性别输入区域标题",
+        },
+        "input_placeholder": {
+            "name": "请输入性别，每行一个性别",
+            "description": "性别输入框占位符",
+        },
+        "save_button": {
+            "name": "Save",
+            "description": "Button text of Save",
+        },
+        "cancel_button": {
+            "name": "Cancel",
+            "description": "Button text of Cancel",
+        },
+        "error_title": {
+            "name": "Error",
+            "description": "Message title of Error",
+        },
+        "success_title": {
+            "name": "Success",
+            "description": "Message title of Success",
+        },
+        "info_title": {
+            "name": "Prompt",
+            "description": "Message title of Info",
+        },
+        "no_genders_error": {
+            "name": "请至少输入一个性别",
+            "description": "未输入性别时的错误提示",
+        },
+        "invalid_genders_error": {
+            "name": "以下性别包含非法字符或为保留字: {genders}",
+            "description": "性别验证失败时的错误提示",
+        },
+        "save_error": {
+            "name": "保存性别选项失败",
+            "description": "保存性别选项时的错误提示",
+        },
+        "success_message": {
+            "name": "成功创建 {count} 个新性别选项",
+            "description": "成功创建性别选项时的提示消息",
+        },
+        "no_new_genders_message": {
+            "name": "所有性别选项均已存在，未创建新的性别选项",
+            "description": "没有创建新性别选项时的提示消息",
+        },
+        "unsaved_changes_title": {
+            "name": "Unsaved changes",
+            "description": "未保存更改对话框标题",
+        },
+        "unsaved_changes_message": {
+            "name": "您有未保存的更改，确定要关闭窗口吗？",
+            "description": "未保存更改对话框内容",
+        },
+        "discard_button": {
+            "name": "Discard changes",
+            "description": "放弃更改按钮文本",
+        },
+        "continue_editing_button": {
+            "name": "Keep editing",
+            "description": "继续编辑按钮文本",
+        },
+        "delete_button": {
+            "name": "Delete",
+            "description": "Button text of Delete",
+        },
+        "delete_gender_title": {
+            "name": "Option of Delete gender",
+            "description": "删除性别选项对话框标题",
+        },
+        "delete_gender_message": {
+            "name": "确定要删除性别选项 '{gender}' 吗？此操作将删除该性别选项的所有信息，且不可恢复",
+            "description": "删除性别选项确认对话框内容",
+        },
+        "delete_multiple_genders_title": {
+            "name": "删除多个性别选项",
+            "description": "删除多个性别选项对话框标题",
+        },
+        "delete_multiple_genders_message": {
+            "name": "确定要删除以下 {count} 个性别选项吗？此操作将删除这些性别选项的所有信息，且不可恢复\n\n{genders}",
+            "description": "删除多个性别选项确认对话框内容",
+        },
+        "delete_gender_success_title": {
+            "name": "Delete success",
+            "description": "删除性别选项成功通知标题",
+        },
+        "delete_gender_success_message": {
+            "name": "成功删除 {count} 个性别选项",
+            "description": "删除性别选项成功通知内容",
+        },
+        "delete_gender_cancel_button": {
+            "name": "Cancel delete",
+            "description": "取消删除性别选项按钮文本",
+        },
+        "no_deletable_genders": {
+            "name": "没有可删除的性别选项",
+            "description": "没有可删除性别选项时的提示",
+        },
+        "select_gender_to_delete": {
+            "name": "请选择要删除的性别选项",
+            "description": "选择删除性别选项的提示",
+        },
+        "select_gender_dialog_title": {
+            "name": "选择要删除的性别选项",
+            "description": "选择删除性别选项对话框标题",
+        },
+        "select_gender_dialog_message": {
+            "name": "请选择要删除的性别选项：",
+            "description": "选择删除性别选项对话框内容",
+        },
+        "delete_selected_genders_button": {
+            "name": "Delete selected",
+            "description": "删除选中性别选项按钮文本",
+        },
+        "delete_gender_error": {
+            "name": "删除性别选项失败: {error}",
+            "description": "删除性别选项失败错误信息",
+        },
+        "gender_deleted_title": {
+            "name": "Gender option deleted",
+            "description": "删除性别选项提示标题",
+        },
+        "gender_deleted_message": {
+            "name": "性别选项 '{gender}' 已从输入框中移除，请保存更改以永久删除",
+            "description": "删除性别选项提示内容",
+        },
+    },
 }
 
 # 小组设置窗口

@@ -2,7 +2,13 @@
 history = {
     "ZH_CN": {
         "title": {"name": "历史记录", "description": "查看和管理点名、抽奖的历史记录"}
-    }
+    },
+    "EN_US": {
+        "title": {
+            "name": "History",
+            "description": "查看和管理点名、抽奖的历史记录",
+        },
+    },
 }
 
 # 历史记录管理语言配置

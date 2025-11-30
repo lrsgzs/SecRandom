@@ -256,7 +256,68 @@ custom_draw_notification_settings = {
             "name": "浮动窗口自动关闭时间",
             "description": "设置浮动窗口自动关闭时间（秒），设为0表示不自动关闭",
         },
-    }
+    },
+    "EN_US": {
+        "title": {
+            "name": "自定义抽通知设置",
+            "description": "自定义抽取通知功能设置",
+        },
+        "basic_settings": {
+            "name": "Basic settings",
+            "description": "Basic settings",
+        },
+        "window_mode": {
+            "name": "Window mode",
+            "description": "设置自定义抽取通知窗口显示方式",
+        },
+        "floating_window_mode": {
+            "name": "Floating window mode",
+            "description": "设置自定义抽取通知浮动窗口行为模式",
+        },
+        "call_notification_service": {
+            "name": "Call notification service",
+            "description": "是否调用系统通知服务发送自定义抽取结果",
+        },
+        "animation": {
+            "name": "Animation",
+            "description": "设置自定义抽取通知窗口显示动画效果",
+        },
+        "floating_window_enabled_monitor": {
+            "name": "选择自定义抽取通知显示的显示器",
+            "description": "选择自定义抽取通知浮动窗口显示器",
+        },
+        "floating_window_position": {
+            "name": "Floating window position",
+            "description": "设置自定义抽取通知浮动窗口屏幕显示位置",
+            "combo_items": {
+                "0": "Center",
+                "1": "Top",
+                "2": "Bottom",
+                "3": "Left",
+                "4": "Right",
+                "5": "Top left",
+                "6": "Top right",
+                "7": "Bottom left",
+                "8": "Bottom right",
+            },
+        },
+        "floating_window_horizontal_offset": {
+            "name": "Horizontal Offset",
+            "description": "设置自定义抽取通知浮动窗口相对默认位置水平偏移量（像素）",
+        },
+        "floating_window_vertical_offset": {
+            "name": "Vertical Offset",
+            "description": "设置自定义抽取通知浮动窗口相对默认位置垂直偏移量（像素）",
+        },
+        "floating_window_transparency": {
+            "name": "Floating window transparency",
+            "description": "设置自定义抽取通知浮动窗口透明度，数值越小越透明（0-100）",
+        },
+        "floating_window_auto_close_time": {
+            "name": "浮动窗口自动关闭时间",
+            "description": "设置浮动窗口自动关闭时间（秒），设为0表示不自动关闭",
+        },
+    },
 }
 
 # 抽奖通知设置

@@ -72,7 +72,99 @@ floating_window_management = {
             "description": "设置浮动窗口贴边时显示样式",
             "combo_items": ["图标", "文字", "箭头"],
         },
-    }
+    },
+    "EN_US": {
+        "title": {
+            "name": "Floating window management",
+            "description": "配置浮动窗口相关设置",
+        },
+        "basic_settings": {
+            "name": "Basic settings",
+            "description": "配置浮动窗口基本设置",
+        },
+        "appearance_settings": {
+            "name": "Appearance settings",
+            "description": "配置浮动窗口外观设置",
+        },
+        "edge_settings": {
+            "name": "Edge settings",
+            "description": "配置浮动窗口贴边设置",
+        },
+        "startup_display_floating_window": {
+            "name": "启动时显示浮窗",
+            "description": "控制软件启动时是否自动显示浮动窗口",
+        },
+        "floating_window_opacity": {
+            "name": "Floating window transparency",
+            "description": "调整浮动窗口透明度",
+        },
+        "reset_floating_window_position_button": {
+            "name": "Reset floating window position",
+            "description": "将浮动窗口位置重置为默认位置",
+            "pushbutton_name": "Reset position",
+        },
+        "floating_window_button_control": {
+            "name": "Floating window controls config",
+            "description": "选择在浮动窗口中显示的功能按钮",
+            "combo_items": {
+                "0": "Pick",
+                "1": "Quick pick",
+                "2": "Instant pick",
+                "3": "Custom pick",
+                "4": "Lottery",
+                "5": "Pick + Quick pick",
+                "6": "Pick + Custom pick",
+                "7": "Pick + Lottery",
+                "8": "Quick pick + Custom pick",
+                "9": "Quick pick + Lottery",
+                "10": "Custom pick + Lottery",
+                "11": "Pick + Quick pick + Custom pick",
+                "12": "Pick + Quick pick + Lottery",
+                "13": "Pick + Custom pick + Lottery",
+                "14": "Quick pick + Custom pick + Lottery",
+                "15": "Pick + Quick pick + Custom pick + Lottery",
+            },
+        },
+        "floating_window_placement": {
+            "name": "Floating window layout",
+            "description": "设置浮动窗口中控件排列方式",
+            "combo_items": {
+                "0": "Rectangle",
+                "1": "Portrait",
+                "2": "Landscape",
+            },
+        },
+        "floating_window_display_style": {
+            "name": "Floating window style",
+            "description": "设置浮动窗口中控件显示样式",
+            "combo_items": {
+                "0": "Icon + Text",
+                "1": "Icon only",
+                "2": "Text only",
+            },
+        },
+        "floating_window_stick_to_edge": {
+            "name": "Edge function",
+            "description": "控制浮动窗口是否自动贴边",
+        },
+        "floating_window_stick_to_edge_recover_seconds": {
+            "name": "Edge receipt time",
+            "description": "设置浮动窗口贴边后自动收纳时间（秒）",
+        },
+        "floating_window_stick_to_edge_display_style": {
+            "name": "Edge style",
+            "description": "设置浮动窗口贴边时显示样式",
+            "combo_items": {
+                "0": "Icon",
+                "1": "Text",
+                "2": "Arrow",
+            },
+        },
+        "floating_window_long_press_duration": {
+            "name": "Long press time",
+            "description": "Set floating window long by time (milliseconds)",
+        },
+    },
 }
 
 # 侧边栏/托盘管理语言配置

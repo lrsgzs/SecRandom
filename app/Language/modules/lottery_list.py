@@ -236,7 +236,173 @@ import_prize_name = {
             "name": "取消导入",
             "description": "取消导入选项",
         },
-    }
+    },
+    "EN_US": {
+        "title": {
+            "name": "Import pool name",
+            "description": "Import pool name from Excel or CSV file",
+        },
+        "initial_subtitle": {
+            "name": "Importing to:",
+            "description": "Importing to the prize pool tips",
+        },
+        "file_selection_title": {
+            "name": "File select",
+            "description": "File Selection Area Title",
+        },
+        "no_file_selected": {
+            "name": "No file selected",
+            "description": "Hint text when no file is selected",
+        },
+        "select_file": {
+            "name": "File select",
+            "description": "Select File Button Text",
+        },
+        "supported_formats": {
+            "name": "Supported formats: Excel (.xlsx, .xls) and CSV (.csv)",
+            "description": "Supported File Format Description",
+        },
+        "file_filter": {
+            "name": "Excel files (*.xlsx *.xls);;CSV files (*.csv)",
+            "description": "File selection dialog filters",
+        },
+        "dialog_title": {
+            "name": "File select",
+            "description": "File selection dialog title",
+        },
+        "column_mapping_title": {
+            "name": "Column mapping",
+            "description": "Column map area title",
+        },
+        "column_mapping_description": {
+            "name": "Please select a column containing the bonus pool information",
+            "description": "Column map area description",
+        },
+        "column_mapping_id_column": {
+            "name": "Serial column (required):",
+            "description": "Serial column label",
+        },
+        "column_mapping_name_column": {
+            "name": "Pool Name Column (required):",
+            "description": "Pool Name List Label",
+        },
+        "column_mapping_weight_column": {
+            "name": "Weight column (optional):",
+            "description": "Reorder Tags",
+        },
+        "column_mapping_none": {
+            "name": "None",
+            "description": "Text of None",
+        },
+        "data_preview_title": {
+            "name": "Data preview",
+            "description": "Preview Area Title",
+        },
+        "prize_id": {
+            "name": "No.",
+            "description": "Serial column title",
+        },
+        "prize_name": {
+            "name": "Pool Name",
+            "description": "Pool Name Column Title",
+        },
+        "weight": {
+            "name": "Weight",
+            "description": "Reorder Title",
+        },
+        "buttons_import": {
+            "name": "Import",
+            "description": "Button text of Import",
+        },
+        "file_loaded_title": {
+            "name": "File loaded",
+            "description": "File loaded successfully dialog title",
+        },
+        "file_loaded_content": {
+            "name": "Files loaded successfully",
+            "description": "File loaded successfully dialog content",
+        },
+        "file_loaded_notification_title": {
+            "name": "Files loaded successfully",
+            "description": "File loaded with successful notification header",
+        },
+        "file_loaded_notification_content": {
+            "name": "File successfully loaded, please check data preview",
+            "description": "File loaded with successful notifications",
+        },
+        "error_title": {
+            "name": "Error",
+            "description": "Dialog title of Error",
+        },
+        "load_failed": {
+            "name": "Failed to load files",
+            "description": "Failed to load file error",
+        },
+        "load_failed_notification_title": {
+            "name": "Failed to load files",
+            "description": "Failed to load file notification title",
+        },
+        "load_failed_notification_content": {
+            "name": "Could not load file. Please check file format and content",
+            "description": "Failed to load notification content",
+        },
+        "import_failed": {
+            "name": "Failed to import data",
+            "description": "Error importing data",
+        },
+        "import_failed_notification_title": {
+            "name": "Failed to import data",
+            "description": "Failed to import data notification title",
+        },
+        "import_failed_notification_content": {
+            "name": "Error importing data. Please check data format and content",
+            "description": "Failed to import data content",
+        },
+        "unsupported_format": {
+            "name": "Unsupported File Format",
+            "description": "Unsupported file format error",
+        },
+        "no_name_column": {
+            "name": "Please select a pool name column",
+            "description": "List of award names not selected",
+        },
+        "no_id_column": {
+            "name": "Please select serial number column",
+            "description": "No serial number error selected",
+        },
+        "import_success_title": {
+            "name": "Import success",
+            "description": "Import successful dialog title",
+        },
+        "import_success_content_template": {
+            "name": "成功导入 {count} 个奖池信息到奖池 '{prize_name}'",
+            "description": "Import successful dialog content template",
+        },
+        "import_success_notification_title": {
+            "name": "Import success",
+            "description": "Import successful notification title",
+        },
+        "import_success_notification_content_template": {
+            "name": "成功导入 {count} 个奖池信息到奖池 '{prize_name}'",
+            "description": "Import successful notification content template",
+        },
+        "existing_data_title": {
+            "name": "Bonus already has data",
+            "description": "Holds already have data dialog title",
+        },
+        "existing_data_prompt": {
+            "name": "奖池 '{prize_name}' 已包含 {count} 个奖池信息，请选择处理方式:",
+            "description": "Bonus already has data dialog tip text",
+        },
+        "existing_data_option_overwrite": {
+            "name": "Overwrite existing data",
+            "description": "Overwrite existing data options",
+        },
+        "existing_data_option_cancel": {
+            "name": "Cancel import",
+            "description": "Option of Cancel import",
+        },
+    },
 }
 
 # 名称设置窗口

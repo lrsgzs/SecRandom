@@ -4,7 +4,21 @@ list_management = {
         "title": {"name": "名单管理", "description": "管理点名、抽奖的名单"},
         "roll_call_list": {"name": "点名名单", "description": "管理点名用学生名单"},
         "lottery_list": {"name": "抽奖名单", "description": "管理抽奖用奖品名单"},
-    }
+    },
+    "EN_US": {
+        "title": {
+            "name": "List management",
+            "description": "管理点名、抽奖的名单",
+        },
+        "roll_call_list": {
+            "name": "Picking list",
+            "description": "Manage list of named students",
+        },
+        "lottery_list": {
+            "name": "Lottery list",
+            "description": "Manage the list of prizes",
+        },
+    },
 }
 
 # 点名名单语言配置

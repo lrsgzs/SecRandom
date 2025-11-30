@@ -275,7 +275,13 @@ instant_draw_settings = {
 
 # 自定义抽设置
 custom_draw_settings = {
-    "ZH_CN": {"title": {"name": "自定义抽设置", "description": "自定义抽取功能设置"}}
+    "ZH_CN": {"title": {"name": "自定义抽设置", "description": "自定义抽取功能设置"}},
+    "EN_US": {
+        "title": {
+            "name": "Custom pick settings",
+            "description": "Custom pick settings",
+        },
+    },
 }
 
 # 抽奖设置

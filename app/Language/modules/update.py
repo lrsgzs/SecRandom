@@ -47,5 +47,114 @@ update = {
             "description": "选择软件更新下载来源",
             "combo_items": ["github", "ghfast", "gh-proxy"],
         },
-    }
+    },
+    "EN_US": {
+        "title": {
+            "name": "Update Settings",
+            "description": "Check and install software updates",
+        },
+        "secrandom_update_text": {
+            "name": "SecRandom Update",
+        },
+        "check_update": {
+            "name": "Check for updates",
+        },
+        "latest_version": {
+            "name": "is up to date",
+        },
+        "new_version_available": {
+            "name": "New version found",
+        },
+        "update_progress": {
+            "name": "Update Progress",
+        },
+        "current_version": {
+            "name": "Current version",
+        },
+        "latest_version_label": {
+            "name": "Latest Version",
+        },
+        "checking_update": {
+            "name": "Checking for updates...",
+        },
+        "check_for_updates": {
+            "name": "Check for updates",
+        },
+        "already_latest_version": {
+            "name": "You are up to date!",
+        },
+        "check_update_failed": {
+            "name": "Failed to check for updates",
+        },
+        "last_check_time": {
+            "name": "Last check update time",
+        },
+        "downloading_update": {
+            "name": "Downloading updates...",
+        },
+        "installing_update": {
+            "name": "Installing updates...",
+        },
+        "update_installed_successfully": {
+            "name": "Update installed successfully!",
+        },
+        "update_installed": {
+            "name": "Update installation successful",
+        },
+        "install_failed": {
+            "name": "Installation failed",
+        },
+        "failed_to_install_update": {
+            "name": "Failed to install update",
+        },
+        "download_failed": {
+            "name": "Download failed",
+        },
+        "failed_to_get_version_info": {
+            "name": "Failed to get version information",
+        },
+        "failed_to_download_update": {
+            "name": "Failed to download update",
+        },
+        "download_and_install": {
+            "name": "Download and Install",
+        },
+        "cancel_update": {
+            "name": "Cancel Update",
+        },
+        "update_cancelled": {
+            "name": "Update cancelled",
+        },
+        "cancelling_update": {
+            "name": "Canceling update...",
+        },
+        "auto_update_mode": {
+            "name": "Automatically check for updates and install",
+            "description": "Set the auto-update mode of the app",
+            "combo_items": {
+                "0": "Never update automatically",
+                "1": "Automatically check for updates and notifications",
+                "2": "Automatically check for updates and downloads",
+                "3": "Automatically check for updates and install",
+            },
+        },
+        "update_channel": {
+            "name": "Update Channel Selection",
+            "description": "Select release channel for software updates",
+            "combo_items": {
+                "0": "Stable Channel",
+                "1": "Test Channel",
+                "2": "Publish Preview Channel",
+            },
+        },
+        "update_source": {
+            "name": "Update source selection",
+            "description": "Select source of download for software update",
+            "combo_items": {
+                "0": "gitHub",
+                "1": "ghfast",
+                "2": "gh-proxy",
+            },
+        },
+    },
 }
