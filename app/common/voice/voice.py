@@ -252,6 +252,9 @@ class VoicePlaybackSystem:
         if self._play_thread and self._play_thread.is_alive():
             self._play_thread.join(timeout=5.0)  # 添加超时保护
         self._clear_queue()
+        # 重置线程状态，允许下次调用start()重新启动
+        self._play_thread = None
+        self._stop_flag.clear()
 
     def _clear_queue(self) -> None:
         """清空播放队列"""
@@ -656,12 +659,17 @@ class TTSHandler:
             if not student_names:
                 return
 
+            # 停止之前的播放，清空队列
+            self.stop()
+            # 重新启动播放线程
+            self.playback_system.start()
+
             # 读取音频设置文件
             audio_settings = {}
             if class_name:
                 audio_file = get_audio_path(f"{class_name}.json")
                 if audio_file.exists():
-                    with open(audio_file, "r", encoding="utf-8") as f:
+                    with open(str(audio_file), "r", encoding="utf-8") as f:
                         audio_settings = json.load(f)
 
             # 应用TTS别名、前缀和后缀
@@ -711,6 +719,9 @@ class TTSHandler:
     ) -> None:
         """系统TTS处理"""
         with self.system_tts_lock:
+            if self.voice_engine is None:
+                logger.error("系统TTS引擎未初始化，无法播放语音")
+                return
             for name in student_names:
                 try:
                     self.voice_engine.say(f"{name}")
@@ -758,8 +769,8 @@ class TTSHandler:
         self, student_names: List[str], config: Dict[str, Any], voice_name: str
     ) -> None:
         """准备并播放语音"""
-        # 设置播放音量
-        self.playback_system.set_volume(config["voice_volume"])
+        # 设置播放音量，转换为0.0-1.0范围
+        self.playback_system.set_volume(config["voice_volume"] / 100.0)
         # 设置播放语速
         self.playback_system.set_speed(config["voice_speed"])
 
@@ -782,3 +793,11 @@ class TTSHandler:
         线程池将在对象销毁时自动关闭
         """
         self.playback_system.stop()
+
+        # 系统TTS引擎也需要停止
+        with self.system_tts_lock:
+            if self.voice_engine is not None:
+                try:
+                    self.voice_engine.stop()
+                except Exception as e:
+                    logger.error(f"停止系统TTS引擎失败: {e}")

@@ -447,7 +447,9 @@ def check_for_updates_on_startup():
                     content = get_content_name_async(
                         "update", "update_notification_content"
                     ).format(version=latest_version)
-                    send_system_notification(title, content)
+                    send_system_notification(
+                        title, content, url="https://secrandom.netlify.app/download"
+                    )
 
                     # 如果是模式2或3，自动下载更新
                     if auto_update_mode in [2, 3]:

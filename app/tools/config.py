@@ -391,13 +391,14 @@ def show_notification(
         raise ValueError(f"不支持的通知类型: {notification_type}")
 
 
-def send_system_notification(title: str, content: str) -> bool:
+def send_system_notification(title: str, content: str, url: str = None) -> bool:
     """
     发送系统通知
 
     Args:
         title: 通知标题
         content: 通知内容
+        url: 点击通知后跳转的URL，默认为下载链接
 
     Returns:
         bool: 通知发送是否成功
@@ -405,6 +406,20 @@ def send_system_notification(title: str, content: str) -> bool:
     try:
         # 获取软件图标路径
         icon_path = str(get_data_path("assets", "icon/secrandom-icon-paper.ico"))
+
+        # 定义点击通知的回调函数
+        def on_notification_click():
+            """点击通知时执行的函数"""
+            try:
+                if url:
+                    import webbrowser
+
+                    webbrowser.open(url)
+                    logger.debug(f"已打开通知链接: {url}")
+                else:
+                    logger.warning("通知未配置URL，无法打开链接")
+            except Exception as e:
+                logger.error(f"打开通知链接失败: {e}")
 
         if sys.platform == "win32":
             # Windows平台
@@ -414,7 +429,12 @@ def send_system_notification(title: str, content: str) -> bool:
 
                 toaster = ToastNotifier()
                 toaster.show_toast(
-                    title, content, icon_path=icon_path, duration=15, threaded=True
+                    title,
+                    content,
+                    icon_path=icon_path,
+                    duration=0,
+                    threaded=True,
+                    callback_on_click=on_notification_click,
                 )
                 logger.debug(f"已发送Windows通知: {title}")
                 return True
@@ -428,7 +448,7 @@ def send_system_notification(title: str, content: str) -> bool:
                         message=content,
                         app_name=APPLY_NAME,
                         app_icon=icon_path,
-                        timeout=15,
+                        timeout=0,
                     )
                     logger.debug(f"已发送Windows通知(使用plyer): {title}")
                     return True
@@ -441,12 +461,28 @@ def send_system_notification(title: str, content: str) -> bool:
                 # 尝试使用notify-send命令
                 import subprocess
 
-                subprocess.run(
-                    ["notify-send", "--icon", icon_path, title, content],
-                    check=True,
-                    timeout=5,
-                )
-                logger.debug(f"已发送Linux通知: {title}")
+                if url:
+                    subprocess.run(
+                        [
+                            "notify-send",
+                            "--icon",
+                            icon_path,
+                            "--action",
+                            f"default={url}",
+                            title,
+                            content,
+                        ],
+                        check=True,
+                        timeout=0,
+                    )
+                    logger.debug(f"已发送Linux通知(包含URL): {title}")
+                else:
+                    subprocess.run(
+                        ["notify-send", "--icon", icon_path, title, content],
+                        check=True,
+                        timeout=0,
+                    )
+                    logger.debug(f"已发送Linux通知(不包含URL): {title}")
                 return True
             except subprocess.CalledProcessError as e:
                 # 如果notify-send不可用，尝试使用plyer
@@ -458,7 +494,7 @@ def send_system_notification(title: str, content: str) -> bool:
                         message=content,
                         app_name=APPLY_NAME,
                         app_icon=icon_path,
-                        timeout=15,
+                        timeout=0,
                     )
                     logger.debug(f"已发送Linux通知(使用plyer): {title}")
                     return True
