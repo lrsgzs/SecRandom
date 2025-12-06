@@ -220,6 +220,33 @@ class LevitationWindow(QWidget):
             or 0
         )
         self._buttons_spec = self._map_button_control(idx)
+        # 贴边隐藏功能配置 - 与现有贴边设置保持一致
+        self.flash_window_side_switch = bool(
+            readme_settings_async(
+                "floating_window_management", "flash_window_side_switch"
+            )
+            or False
+        )
+        # 复用现有的贴边回收秒数配置
+        self.custom_retract_time = int(
+            readme_settings_async(
+                "floating_window_management",
+                "floating_window_stick_to_edge_recover_seconds",
+            )
+            or 5
+        )
+        # 复用现有的贴边显示样式配置
+        self.custom_display_mode = int(
+            readme_settings_async(
+                "floating_window_management",
+                "floating_window_stick_to_edge_display_style",
+            )
+            or 1
+        )
+        # 新增属性
+        self._retracted = False
+        self._edge_threshold = 5
+        self._hidden_width = 10
 
     def _build_ui(self):
         # 两行布局按索引分配，避免 3+ 个按钮全部落到底部
@@ -429,6 +456,11 @@ class LevitationWindow(QWidget):
                 else:
                     self._clear_indicator()
             self._save_position()
+
+            # 如果启用了边缘贴边隐藏功能，在拖动结束后检查是否需要贴边
+            if self.flash_window_side_switch:
+                # 使用定时器延迟执行边缘检测，确保位置已经保存
+                QTimer.singleShot(100, self._check_edge_proximity)
             pass
 
     def eventFilter(self, obj, event):
@@ -468,6 +500,11 @@ class LevitationWindow(QWidget):
                     else:
                         self._clear_indicator()
                     self._save_position()
+
+                    # 如果启用了边缘贴边隐藏功能，在拖动结束后检查是否需要贴边
+                    if self.flash_window_side_switch:
+                        # 使用定时器延迟执行边缘检测，确保位置已经保存
+                        QTimer.singleShot(100, self._check_edge_proximity)
                     pass
                     return True
             return False
@@ -481,10 +518,28 @@ class LevitationWindow(QWidget):
     def enterEvent(self, e):
         if self._retracted:
             self._expand_from_edge()
+        # 当鼠标进入窗口时，删除可能存在的自动隐藏定时器
+        if hasattr(self, "_auto_hide_timer"):
+            if self._auto_hide_timer.isActive():
+                self._auto_hide_timer.stop()
+            # 从对象中移除定时器属性，避免内存泄漏
+            delattr(self, "_auto_hide_timer")
 
     def leaveEvent(self, e):
         if self._retracted:
             self._schedule_retract()
+
+        # 如果启用了边缘贴边隐藏功能，当鼠标离开窗口时，延迟后自动隐藏
+        if self.flash_window_side_switch and not self._retracted:
+            # 清除旧的定时器
+            if hasattr(self, "_auto_hide_timer") and self._auto_hide_timer.isActive():
+                self._auto_hide_timer.stop()
+            # 创建或重置自动隐藏定时器
+            self._auto_hide_timer = QTimer(self)
+            self._auto_hide_timer.setSingleShot(True)
+            self._auto_hide_timer.timeout.connect(self._auto_hide_window)
+            # 设置延迟时间
+            self._auto_hide_timer.start(self.custom_retract_time * 1000)
 
     def _stick_to_nearest_edge(self):
         if not self._stick_to_edge:
@@ -497,12 +552,16 @@ class LevitationWindow(QWidget):
         self._last_stuck = False
         if left <= self._edge_threshold:
             self.move(geo.left(), self.y())
-            self._show_indicator("left")
+            # 如果启用了新的贴边隐藏功能，不显示旧的指示器
+            if not self.flash_window_side_switch:
+                self._show_indicator("left")
             self._last_stuck = True
             return
         if right <= self._edge_threshold:
             self.move(geo.right() - self.width() + 1, self.y())
-            self._show_indicator("right")
+            # 如果启用了新的贴边隐藏功能，不显示旧的指示器
+            if not self.flash_window_side_switch:
+                self._show_indicator("right")
             self._last_stuck = True
 
     def _schedule_retract(self):
@@ -525,11 +584,15 @@ class LevitationWindow(QWidget):
         if self.x() <= geo.left():
             self.move(geo.left() - self.width() + handle, self.y())
             self._retracted = True
-            self._show_indicator("right")
+            # 如果启用了新的贴边隐藏功能，不显示旧的指示器
+            if not self.flash_window_side_switch:
+                self._show_indicator("right")
         elif self.x() + self.width() >= geo.right():
             self.move(geo.right() - handle + 1, self.y())
             self._retracted = True
-            self._show_indicator("left")
+            # 如果启用了新的贴边隐藏功能，不显示旧的指示器
+            if not self.flash_window_side_switch:
+                self._show_indicator("left")
 
     def _expand_from_edge(self):
         # 基于当前屏幕可用区域展开
@@ -542,6 +605,124 @@ class LevitationWindow(QWidget):
             self.move(geo.right() - self.width() + 1, self.y())
         self._retracted = False
         self._clear_indicator()
+
+    def _check_edge_proximity(self):
+        """检测窗口是否靠近屏幕边缘，并实现贴边隐藏功能（带动画效果）"""
+        # 如果有正在进行的动画，先停止它
+        if (
+            hasattr(self, "animation")
+            and self.animation.state() == QPropertyAnimation.Running
+        ):
+            self.animation.stop()
+
+        # 清除可能存在的旧指示器
+        self._clear_indicator()
+
+        # 获取屏幕尺寸
+        screen = QApplication.primaryScreen().availableGeometry()
+
+        # 获取窗口当前位置和尺寸
+        window_pos = self.pos()
+        window_width = self.width()
+        window_height = self.height()
+
+        # 定义边缘阈值（像素）
+        edge_threshold = 5
+        hidden_width = 10  # 隐藏后露出的宽度
+
+        # 检测左边缘
+        if window_pos.x() <= edge_threshold:
+            # 保存主浮窗的原始位置（但不更新实际坐标）
+            if not hasattr(self, "_original_position"):
+                self._original_position = window_pos
+
+            # 创建平滑动画效果
+            self.animation = QPropertyAnimation(self, b"geometry")
+            # 设置动画持续时间（更流畅的过渡）
+            self.animation.setDuration(400)
+            # 设置缓动曲线（使用更自然的缓动）
+            self.animation.setEasingCurve(QEasingCurve.Type.OutCubic)
+
+            # 设置动画起始值（当前位置）
+            self.animation.setStartValue(self.geometry())
+
+            # 设置动画结束值（隐藏位置）
+            end_rect = QRect(
+                -window_width + hidden_width,
+                window_pos.y(),
+                window_width,
+                window_height,
+            )
+            self.animation.setEndValue(end_rect)
+
+            # 动画完成后创建收纳浮窗
+            def on_animation_finished():
+                self._create_storage_window(
+                    "right", 0, window_pos.y() + window_height // 2 - 30
+                )
+                # 标记为已收纳状态，但保持原始坐标不变
+                self._retracted = True
+
+            self.animation.finished.connect(on_animation_finished)
+
+            # 启动动画
+            self.animation.start()
+            return
+
+        # 检测右边缘
+        elif window_pos.x() + window_width >= screen.width() - edge_threshold:
+            # 保存主浮窗的原始位置（但不更新实际坐标）
+            if not hasattr(self, "_original_position"):
+                self._original_position = window_pos
+
+            # 创建平滑动画效果
+            self.animation = QPropertyAnimation(self, b"geometry")
+            # 设置动画持续时间（更流畅的过渡）
+            self.animation.setDuration(400)
+            # 设置缓动曲线（使用更自然的缓动）
+            self.animation.setEasingCurve(QEasingCurve.Type.OutCubic)
+
+            # 设置动画起始值（当前位置）
+            self.animation.setStartValue(self.geometry())
+
+            # 设置动画结束值（隐藏位置）
+            end_rect = QRect(
+                screen.width() - hidden_width,
+                window_pos.y(),
+                window_width,
+                window_height,
+            )
+            self.animation.setEndValue(end_rect)
+
+            # 动画完成后创建收纳浮窗
+            def on_animation_finished():
+                self._create_storage_window(
+                    "left",
+                    screen.width() - 30,
+                    window_pos.y() + window_height // 2 - 30,
+                )
+                # 标记为已收纳状态，但保持原始坐标不变
+                self._retracted = True
+
+            self.animation.finished.connect(on_animation_finished)
+
+            # 启动动画
+            self.animation.start()
+            return
+
+        # 保存新位置（仅在窗口未贴边隐藏时）
+        if (
+            window_pos.x() > edge_threshold
+            and window_pos.x() + window_width < screen.width() - edge_threshold
+        ):
+            # 只有在非收纳状态下才保存位置
+            if not self._retracted:
+                self._save_position()
+            # 清除原始位置
+            if hasattr(self, "_original_position"):
+                delattr(self, "_original_position")
+
+        self._retracted = False
 
     def _show_indicator(self, direction):
         self._clear_indicator()
@@ -574,6 +755,268 @@ class LevitationWindow(QWidget):
             self._indicator.hide()
             self._indicator.deleteLater()
             self._indicator = None
+
+    def _create_storage_window(self, direction, x, y):
+        """创建只能在y轴移动的收纳浮窗"""
+        # 先删除可能存在的收纳浮窗
+        self._delete_storage_window()
+
+        # 创建收纳浮窗
+        self.storage_window = QWidget()
+        self.storage_window.setWindowFlags(
+            Qt.FramelessWindowHint | Qt.WindowStaysOnTopHint | Qt.Tool | Qt.NoFocus
+        )
+        self.storage_window.setAttribute(Qt.WA_TranslucentBackground)
+
+        # 设置收纳浮窗尺寸
+        self.storage_window.setFixedSize(30, 30)
+
+        # 根据主题设置不同的背景颜色，与主浮窗保持一致
+        dark = is_dark_theme(qconfig)
+        opacity = self._opacity
+
+        if dark:
+            bg_color = f"rgba(32, 32, 32, {opacity})"
+            color = "#ffffff"
+        else:
+            bg_color = f"rgba(255, 255, 255, {opacity})"
+            color = "#000000"
+
+        # 设置收纳浮窗样式，与主浮窗保持一致的风格
+        self.storage_window.setStyleSheet(
+            f"background-color: {bg_color};"
+            "border-radius: 15px;"
+            "border: 1px solid rgba(0, 0, 0, 12);"
+            "background-clip: padding-box;"
+        )
+
+        # 创建标签显示内容
+        label = BodyLabel(self.storage_window)
+        label.setAlignment(Qt.AlignCenter)
+
+        # 根据方向设置显示内容
+        if direction == "right":
+            label.setText(">")
+        elif direction == "left":
+            label.setText("<")
+
+        label.setStyleSheet(f"color: {color}; font-size: 12px; font-weight: bold;")
+        label.setGeometry(0, 0, 30, 30)
+
+        # 设置收纳浮窗位置
+        self.storage_window.move(x, y)
+
+        # 初始化拖动相关属性
+        self._storage_dragging = False
+        self._storage_drag_start = QPoint()
+
+        # 连接鼠标事件
+        self.storage_window.mousePressEvent = self._on_storage_press
+        self.storage_window.mouseMoveEvent = self._on_storage_move
+        self.storage_window.mouseReleaseEvent = self._on_storage_release
+
+        # 存储收纳浮窗方向和初始位置
+        self._storage_direction = direction
+        self._storage_initial_x = x
+
+        # 添加悬停效果，提升用户体验
+        self.storage_window.setMouseTracking(True)
+        self.storage_window.enterEvent = self._on_storage_enter
+        self.storage_window.leaveEvent = self._on_storage_leave
+
+        # 显示收纳浮窗
+        self.storage_window.show()
+
+    def _on_storage_enter(self, event):
+        """收纳浮窗鼠标进入事件"""
+        if hasattr(self, "storage_window") and self.storage_window:
+            # 鼠标悬停时增加透明度
+            current_style = self.storage_window.styleSheet()
+            if "background-clip: padding-box;" in current_style:
+                self.storage_window.setStyleSheet(
+                    current_style
+                    + "background-color: rgba("
+                    + current_style.split("rgba(")[1].split(")")[0]
+                    + ", 0.9);"
+                )
+
+    def _on_storage_leave(self, event):
+        """收纳浮窗鼠标离开事件"""
+        if hasattr(self, "storage_window") and self.storage_window:
+            # 鼠标离开时恢复原始透明度
+            current_style = self.storage_window.styleSheet()
+            if "background-clip: padding-box;" in current_style:
+                self.storage_window.setStyleSheet(
+                    current_style.split("background-color: rgba(")[0]
+                    + "background-color: rgba("
+                    + current_style.split("rgba(")[1].split(")")[0]
+                    + ", "
+                    + str(self._opacity)
+                    + ");"
+                    + "background-clip: padding-box;"
+                )
+
+    def _delete_storage_window(self):
+        """删除收纳浮窗"""
+        if hasattr(self, "storage_window") and self.storage_window:
+            self.storage_window.deleteLater()
+            self.storage_window = None
+
+    def _on_storage_press(self, event):
+        """收纳浮窗按下事件"""
+        if event.button() == Qt.LeftButton:
+            self._storage_drag_start = event.pos()
+            self._storage_dragging = False
+
+    def _on_storage_move(self, event):
+        """收纳浮窗移动事件 - 只允许y轴移动"""
+        if event.buttons() & Qt.LeftButton:
+            delta = event.pos() - self._storage_drag_start
+            if not self._storage_dragging:
+                # 检测是否超过拖动阈值
+                if abs(delta.y()) > 3:
+                    self._storage_dragging = True
+            if self._storage_dragging:
+                # 只在y轴移动，x轴保持固定
+                new_y = self.storage_window.y() + delta.y()
+                # 限制在屏幕内
+                screen = QApplication.primaryScreen().availableGeometry()
+                new_y = max(
+                    screen.top(),
+                    min(new_y, screen.bottom() - self.storage_window.height()),
+                )
+                self.storage_window.move(self._storage_initial_x, new_y)
+
+    def _on_storage_release(self, event):
+        """收纳浮窗释放事件"""
+        if event.button() == Qt.LeftButton:
+            if not self._storage_dragging:
+                # 点击事件 - 展开主浮窗
+                self._expand_window()
+            self._storage_dragging = False
+        elif event.button() == Qt.RightButton:
+            # 右键点击 - 展开主浮窗（提供额外的交互方式）
+            if not self._storage_dragging:
+                self._expand_window()
+
+    def _expand_window(self):
+        """展开隐藏的窗口（带动画效果）"""
+        # 如果收纳浮窗不存在，直接返回
+        if not hasattr(self, "storage_window") or not self.storage_window:
+            return
+
+        # 保存收纳浮窗的当前位置和尺寸
+        storage_window = self.storage_window
+        storage_pos = storage_window.pos()
+        storage_width = storage_window.width()
+        storage_height = storage_window.height()
+
+        # 获取屏幕尺寸
+        screen = QApplication.primaryScreen().availableGeometry()
+
+        # 创建收纳浮窗的退出动画
+        storage_animation = QPropertyAnimation(storage_window, b"geometry")
+        storage_animation.setDuration(200)
+        storage_animation.setEasingCurve(QEasingCurve.Type.OutQuad)
+
+        # 设置收纳浮窗动画的起始值和结束值
+        storage_animation.setStartValue(storage_window.geometry())
+
+        # 根据收纳浮窗的位置，将其移动到屏幕外
+        if storage_pos.x() < screen.width() // 2:
+            # 左侧收纳浮窗，向右移出屏幕
+            storage_end_rect = QRect(
+                screen.width(),
+                storage_pos.y(),
+                storage_width,
+                storage_height,
+            )
+        else:
+            # 右侧收纳浮窗，向左移出屏幕
+            storage_end_rect = QRect(
+                -storage_width,
+                storage_pos.y(),
+                storage_width,
+                storage_height,
+            )
+        storage_animation.setEndValue(storage_end_rect)
+
+        # 获取主窗口当前尺寸
+        window_width = self.width()
+        window_height = self.height()
+
+        # 如果有正在进行的动画，先停止它
+        if (
+            hasattr(self, "animation")
+            and self.animation.state() == QPropertyAnimation.Running
+        ):
+            self.animation.stop()
+
+        # 定义主窗口的动画完成回调
+        def on_main_animation_finished():
+            self._retracted = False
+            # 激活主窗口，确保窗口显示在最前面
+            self.raise_()
+            self.activateWindow()
+            # 设置自动隐藏定时器
+            self._auto_hide_timer = QTimer(self)
+            self._auto_hide_timer.setSingleShot(True)
+            self._auto_hide_timer.timeout.connect(self._auto_hide_window)
+            self._auto_hide_timer.start(self.custom_retract_time * 1000)
+
+        # 定义收纳浮窗动画完成后的回调
+        def on_storage_animation_finished():
+            # 删除收纳浮窗
+            self._delete_storage_window()
+
+            # 获取主窗口应该恢复到的位置
+            if hasattr(self, "_original_position"):
+                # 使用保存的原始位置
+                target_x = self._original_position.x()
+                target_y = self._original_position.y()
+            else:
+                # 如果没有保存的原始位置，使用默认位置
+                if self.x() < screen.left():
+                    # 从左侧展开
+                    target_x = screen.left()
+                elif self.x() + window_width > screen.right():
+                    # 从右侧展开
+                    target_x = screen.right() - window_width + 1
+                target_y = self.y()
+
+            # 创建主窗口的动画效果
+            self.animation = QPropertyAnimation(self, b"geometry")
+            self.animation.setDuration(300)
+            self.animation.setEasingCurve(
+                QEasingCurve.Type.OutCubic
+            )  # 使用更自然的缓动曲线
+
+            # 设置主窗口动画的起始值和结束值
+            self.animation.setStartValue(self.geometry())
+            main_end_rect = QRect(target_x, target_y, window_width, window_height)
+            self.animation.setEndValue(main_end_rect)
+
+            # 连接主窗口动画的完成信号
+            self.animation.finished.connect(on_main_animation_finished)
+
+            # 启动主窗口动画
+            self.animation.start()
+
+        # 连接收纳浮窗动画的完成信号
+        storage_animation.finished.connect(on_storage_animation_finished)
+
+        # 启动收纳浮窗动画
+        storage_animation.start()
+
+    def _auto_hide_window(self):
+        """自动隐藏窗口"""
+        # 检查是否启用了边缘贴边隐藏功能
+        if self.flash_window_side_switch:
+            # 清除自动隐藏定时器
+            if hasattr(self, "_auto_hide_timer") and self._auto_hide_timer.isActive():
+                self._auto_hide_timer.stop()
+            # 调用边缘检测方法隐藏窗口
+            self._check_edge_proximity()
 
     def _save_position(self):
         update_settings("float_position", "x", self.x())
@@ -610,6 +1053,21 @@ class LevitationWindow(QWidget):
                 self.rebuild_ui()
             elif second == "floating_window_draggable":
                 self._draggable = bool(value)
+            # 贴边隐藏功能配置项
+            elif second == "flash_window_side_switch":
+                self.flash_window_side_switch = bool(value)
+                # 如果启用了功能，立即检查边缘
+                if bool(value):
+                    QTimer.singleShot(100, self._check_edge_proximity)
+                else:
+                    # 如果禁用了功能，删除收纳浮窗并展开窗口
+                    self._delete_storage_window()
+                    if self._retracted:
+                        self._expand_from_edge()
+            elif second == "custom_retract_time":
+                self.custom_retract_time = int(value or 5)
+            elif second == "custom_display_mode":
+                self.custom_display_mode = int(value or 1)
             # 当任何影响外观的设置改变时，重新应用主题样式
             self._apply_theme_style()
         elif first == "float_position":
