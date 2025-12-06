@@ -5,6 +5,7 @@
 """
 
 # --------- 标准库 ---------
+import json
 import asyncio
 import concurrent.futures
 import os
@@ -634,6 +635,7 @@ class TTSHandler:
         student_names: List[str],
         engine_type: int,
         voice_name: str,
+        class_name: str = "",
     ) -> None:
         """主入口函数"""
         # 输入验证
@@ -654,20 +656,51 @@ class TTSHandler:
             if not student_names:
                 return
 
+            # 读取音频设置文件
+            audio_settings = {}
+            if class_name:
+                audio_file = get_audio_path(f"{class_name}.json")
+                if audio_file.exists():
+                    with open(audio_file, "r", encoding="utf-8") as f:
+                        audio_settings = json.load(f)
+
+            # 应用TTS别名、前缀和后缀
+            processed_names = []
+            for name in student_names:
+                # 获取对应的音频设置，如果不存在则使用默认值
+                settings = audio_settings.get(name, {})
+                tts_alias = settings.get("tts_alias", "")
+                prefix = settings.get("prefix", "")
+                suffix = settings.get("suffix", "")
+
+                # 构建最终的播报文本
+                announcement_text = []
+                if prefix:
+                    announcement_text.append(prefix)
+                if tts_alias:
+                    announcement_text.append(tts_alias)
+                else:
+                    announcement_text.append(name)
+                if suffix:
+                    announcement_text.append(suffix)
+
+                processed_names.append(" ".join(announcement_text))
+
             # 添加日志，记录要播放的学生名单
-            logger.debug(f"准备播放语音，学生名单: {student_names}")
+            logger.debug(f"准备播放语音，原始学生名单: {student_names}")
+            logger.debug(f"处理后学生名单: {processed_names}")
             logger.debug(f"语音引擎类型: {engine_type}，语音名称: {voice_name}")
 
             # 系统TTS处理
             if engine_type == 0:
                 logger.debug(f"使用系统TTS播放，配置: {config}")
-                self._handle_system_tts(student_names, config)
+                self._handle_system_tts(processed_names, config)
                 logger.info("系统TTS播报")
 
             # Edge TTS处理
             elif engine_type == 1:
                 logger.debug(f"使用Edge TTS播放，配置: {config}")
-                self._handle_edge_tts(student_names, config, voice_name)
+                self._handle_edge_tts(processed_names, config, voice_name)
                 logger.info("Edge TTS播报")
 
         except Exception as e:

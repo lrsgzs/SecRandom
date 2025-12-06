@@ -629,6 +629,7 @@ class roll_call(QWidget):
                 student_names=student_names,
                 engine_type=engine_type,
                 voice_name=edge_tts_voice_name,
+                class_name=self.list_combobox.currentText(),
             )
         except Exception as e:
             logger.error(f"播放语音失败: {e}", exc_info=True)
