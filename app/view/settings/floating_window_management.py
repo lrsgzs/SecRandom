@@ -126,6 +126,33 @@ class floating_window_basic_settings(GroupHeaderCardWidget):
             self.reset_floating_window_position_button_clicked
         )
 
+        # 浮窗可拖动开关
+        self.floating_window_draggable_switch = SwitchButton()
+        self.floating_window_draggable_switch.setOffText(
+            get_content_switchbutton_name_async(
+                "floating_window_management",
+                "floating_window_draggable",
+                "disable",
+            )
+        )
+        self.floating_window_draggable_switch.setOnText(
+            get_content_switchbutton_name_async(
+                "floating_window_management",
+                "floating_window_draggable",
+                "enable",
+            )
+        )
+        self.floating_window_draggable_switch.setChecked(
+            readme_settings_async(
+                "floating_window_management", "floating_window_draggable"
+            )
+        )
+        self.floating_window_draggable_switch.checkedChanged.connect(
+            lambda checked: update_settings(
+                "floating_window_management", "floating_window_draggable", checked
+            )
+        )
+
         # 浮窗长按拖动时间
         self.floating_window_long_press_duration_spinbox = SpinBox()
         self.floating_window_long_press_duration_spinbox.setFixedWidth(WIDTH_SPINBOX)
@@ -165,6 +192,16 @@ class floating_window_basic_settings(GroupHeaderCardWidget):
                 "floating_window_management", "floating_window_opacity"
             ),
             self.floating_window_opacity_spinbox,
+        )
+        self.addGroup(
+            get_theme_icon("ic_fluent_gesture_20_filled"),
+            get_content_name_async(
+                "floating_window_management", "floating_window_draggable"
+            ),
+            get_content_description_async(
+                "floating_window_management", "floating_window_draggable"
+            ),
+            self.floating_window_draggable_switch,
         )
         self.addGroup(
             get_theme_icon("ic_fluent_gesture_20_filled"),

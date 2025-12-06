@@ -63,6 +63,11 @@ floating_window_management = {
             "name": "贴边收纳时间",
             "description": "设置浮动窗口贴边后自动收纳时间（秒）",
         },
+        "floating_window_draggable": {
+            "name": "浮窗可拖动",
+            "description": "控制浮动窗口是否可被拖动",
+            "switchbutton_name": {"enable": "", "disable": ""},
+        },
         "floating_window_long_press_duration": {
             "name": "长按时间",
             "description": "设置浮动窗口长按时间（毫秒）",
@@ -159,6 +164,10 @@ floating_window_management = {
                 "1": "Text",
                 "2": "Arrow",
             },
+        },
+        "floating_window_draggable": {
+            "name": "Floating window draggable",
+            "description": "Control whether the floating window can be dragged",
         },
         "floating_window_long_press_duration": {
             "name": "Long press time",

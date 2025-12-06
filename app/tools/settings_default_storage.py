@@ -403,6 +403,7 @@ DEFAULT_SETTINGS = {
         "floating_window_stick_to_edge_recover_seconds": {"default_value": 5},
         "floating_window_long_press_duration": {"default_value": 500},
         "floating_window_stick_to_edge_display_style": {"default_value": 1},
+        "floating_window_draggable": {"default_value": True},
     },
     "sidebar_tray_management": {"title": {"default_value": None}},
     "sidebar_management_window": {

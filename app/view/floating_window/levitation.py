@@ -200,6 +200,12 @@ class LevitationWindow(QWidget):
             )
             or 500
         )
+        self._draggable = bool(
+            readme_settings_async(
+                "floating_window_management", "floating_window_draggable"
+            )
+            or True
+        )
         self._stick_indicator_style = int(
             readme_settings_async(
                 "floating_window_management",
@@ -386,7 +392,7 @@ class LevitationWindow(QWidget):
             self._bottom.layout().addWidget(btn, 0, Qt.AlignCenter)
 
     def mousePressEvent(self, e):
-        if e.button() == Qt.LeftButton:
+        if e.button() == Qt.LeftButton and self._draggable:
             self._press_pos = e.globalPosition().toPoint()
             self._dragging = False
             self._drag_timer.stop()
@@ -398,7 +404,7 @@ class LevitationWindow(QWidget):
         pass
 
     def mouseMoveEvent(self, e):
-        if e.buttons() & Qt.LeftButton:
+        if e.buttons() & Qt.LeftButton and self._draggable:
             # 支持移动阈值触发拖拽，提升交互体验
             cur = e.globalPosition().toPoint()
             if not self._dragging:
@@ -415,7 +421,7 @@ class LevitationWindow(QWidget):
         if e.button() == Qt.LeftButton:
             self._drag_timer.stop()
             self.setCursor(Qt.ArrowCursor)
-            if self._dragging:
+            if self._draggable and self._dragging:
                 self._dragging = False
                 self._stick_to_nearest_edge()
                 if self._last_stuck:
@@ -426,6 +432,9 @@ class LevitationWindow(QWidget):
             pass
 
     def eventFilter(self, obj, event):
+        if not self._draggable:
+            return False
+
         if event.type() == QEvent.MouseButtonPress:
             if event.button() == Qt.LeftButton:
                 self._press_pos = event.globalPosition().toPoint()
@@ -599,6 +608,8 @@ class LevitationWindow(QWidget):
             elif second == "floating_window_button_control":
                 self._buttons_spec = self._map_button_control(int(value or 0))
                 self.rebuild_ui()
+            elif second == "floating_window_draggable":
+                self._draggable = bool(value)
             # 当任何影响外观的设置改变时，重新应用主题样式
             self._apply_theme_style()
         elif first == "float_position":
