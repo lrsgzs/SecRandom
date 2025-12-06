@@ -96,37 +96,18 @@ class VoicePlaybackSystem:
 
     def _playback_worker(self) -> None:
         """播放线程主循环"""
-        last_queue_adjust_time = 0
-        queue_adjust_interval = 5.0  # 队列大小调整间隔，单位：秒
-        idle_interval = 60.0  # 队列为空时的检测间隔，单位：秒
-
         while not self._stop_flag.is_set():
             try:
-                current_time = time.time()
-                is_queue_empty = self.play_queue.empty()
-
-                # 根据队列状态调整检测频率
-                if is_queue_empty:
-                    # 队列为空时，降低检测频率
-                    adjust_interval = idle_interval
-                else:
-                    # 队列不为空时，正常检测频率
-                    adjust_interval = queue_adjust_interval
-
-                # 只有当满足时间间隔或队列不为空时，才调整队列大小
-                if current_time - last_queue_adjust_time >= adjust_interval:
-                    # 动态调整队列大小
-                    new_queue_size = self._load_balancer.get_optimal_queue_size()
-                    if self.play_queue.maxsize != new_queue_size:
-                        self.play_queue.maxsize = new_queue_size
-                        logger.debug(f"队列大小调整为: {new_queue_size}")
-                    last_queue_adjust_time = current_time
-
                 # 非阻塞获取任务，设置超时时间避免无限等待
-                # 根据队列状态调整超时时间
-                timeout = 0.1 if is_queue_empty else 1.0
+                timeout = 0.1  # 短暂超时，平衡响应速度和CPU占用
                 task = self.play_queue.get(timeout=timeout)
                 logger.debug(f"获取到播放任务: {type(task).__name__}")
+
+                # 只有在有实际播放任务时，才进行系统负载检测和队列大小调整
+                new_queue_size = self._load_balancer.get_optimal_queue_size()
+                if self.play_queue.maxsize != new_queue_size:
+                    self.play_queue.maxsize = new_queue_size
+                    logger.debug(f"队列大小调整为: {new_queue_size}")
 
                 # 处理两种任务格式：文件路径或内存数据
                 if isinstance(task, tuple):  # 内存数据

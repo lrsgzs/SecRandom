@@ -1,10 +1,6 @@
 # ==================================================
 # 导入库
 # ==================================================
-import asyncio
-import edge_tts
-import aiohttp
-
 from loguru import logger
 from PySide6.QtWidgets import *
 from PySide6.QtGui import *
@@ -18,6 +14,9 @@ from app.tools.personalised import *
 from app.tools.settings_default import *
 from app.tools.settings_access import *
 from app.Language.obtain_language import *
+
+# 导入Edge TTS Worker
+from app.common.voice.edge_tts_worker import EdgeTTSWorker
 
 
 # ==================================================
@@ -39,10 +38,6 @@ class basic_voice_settings(QWidget):
         self.volume_widget = basic_settings_volume(self)
         self.vBoxLayout.addWidget(self.volume_widget)
 
-        # 添加系统音量控制组件
-        self.system_volume_widget = basic_settings_system_volume(self)
-        self.vBoxLayout.addWidget(self.system_volume_widget)
-
 
 class basic_settings_voice_engine(GroupHeaderCardWidget):
     def __init__(self, parent=None):
@@ -52,8 +47,8 @@ class basic_settings_voice_engine(GroupHeaderCardWidget):
         )
         self.setBorderRadius(8)
 
-        # 初始化异步更新相关变量
-        self._is_updating_voices = False
+        # 初始化Edge TTS Worker
+        self.edge_tts_worker = None
 
         # 语音引擎设置
         self.voice_engine = ComboBox()
@@ -63,34 +58,34 @@ class basic_settings_voice_engine(GroupHeaderCardWidget):
         self.voice_engine.setCurrentText(
             readme_settings_async("basic_voice_settings", "voice_engine")
         )
-        self.voice_engine.currentTextChanged.connect(self.on_voice_engine_changed)
+        self.voice_engine.currentIndexChanged.connect(self.on_voice_engine_changed)
 
         # 初始化Edge TTS语音名称设置
-        self.edge_tts_voice_name = ComboBox()
-        self.edge_tts_voice_name.addItems(
+        self.edge_tts_voiceComboBox = ComboBox()
+        self.edge_tts_voiceComboBox.addItems(
             get_content_combo_name_async("basic_voice_settings", "edge_tts_voice_name")
         )
-        self.edge_tts_voice_name.setCurrentText(
+        self.edge_tts_voiceComboBox.setCurrentText(
             readme_settings_async("basic_voice_settings", "edge_tts_voice_name")
         )
-        self.edge_tts_voice_name.currentTextChanged.connect(
+        self.edge_tts_voiceComboBox.currentTextChanged.connect(
             lambda text: update_settings(
                 "basic_voice_settings", "edge_tts_voice_name", text
             )
         )
 
         # 根据当前语音引擎设置Edge TTS语音名称的可用性
-        current_engine = self.voice_engine.currentText()
-        self.edge_tts_voice_name.setEnabled(current_engine == "Edge TTS")
+        current_index = self.voice_engine.currentIndex()
+        self.edge_tts_voiceComboBox.setEnabled(current_index == 1)
 
-        # 如果当前是Edge TTS，异步更新语音列表
-        if current_engine == "Edge TTS":
-            QTimer.singleShot(1000, self._async_update_edge_tts_voices)
+        # 如果当前是Edge TTS，更新语音列表
+        if current_index == 1:
+            self.update_edge_tts_voices()
 
         # 语速调节设置
         self.speech_rate = SpinBox()
         self.speech_rate.setFixedWidth(WIDTH_SPINBOX)
-        self.speech_rate.setRange(0, 100)
+        self.speech_rate.setRange(1, 500)
         self.speech_rate.setSuffix("wpm")
         self.speech_rate.setValue(
             int(readme_settings_async("basic_voice_settings", "speech_rate"))
@@ -112,7 +107,7 @@ class basic_settings_voice_engine(GroupHeaderCardWidget):
             get_content_description_async(
                 "basic_voice_settings", "edge_tts_voice_name"
             ),
-            self.edge_tts_voice_name,
+            self.edge_tts_voiceComboBox,
         )
         self.addGroup(
             get_theme_icon("ic_fluent_top_speed_20_filled"),
@@ -121,171 +116,67 @@ class basic_settings_voice_engine(GroupHeaderCardWidget):
             self.speech_rate,
         )
 
-    def on_voice_engine_changed(self, text):
+    def on_voice_engine_changed(self, index):
         """语音引擎改变时的处理函数"""
+        # 根据索引获取当前引擎文本
+        current_engine = self.voice_engine.itemText(index)
         # 更新设置
-        update_settings("basic_voice_settings", "voice_engine", text)
+        update_settings("basic_voice_settings", "voice_engine", current_engine)
 
         # 根据选择的引擎启用/禁用Edge TTS语音名称选择
-        is_edge_tts = text == "Edge TTS"
-        self.edge_tts_voice_name.setEnabled(is_edge_tts)
+        self.edge_tts_voiceComboBox.setEnabled(index == 1)
 
-        # 当切换到Edge TTS时，延迟异步更新语音列表，避免频繁触发网络请求
-        if is_edge_tts:
-            # 使用QTimer延迟执行，给UI一些响应时间
-            QTimer.singleShot(500, self._async_update_edge_tts_voices)
+        # 如果切换到Edge TTS，更新语音列表
+        if index == 1:
+            self.update_edge_tts_voices()
 
-    def _async_update_edge_tts_voices(self):
+    def update_edge_tts_voices(self):
         """异步更新Edge TTS语音列表"""
-        # 如果正在更新，则不再重复请求
-        if self._is_updating_voices:
-            return
+        # 如果worker正在运行，先停止
+        if self.edge_tts_worker and self.edge_tts_worker.isRunning():
+            self.edge_tts_worker.terminate()
+            self.edge_tts_worker.wait()
 
-        self._is_updating_voices = True
+        # 创建新的worker实例
+        self.edge_tts_worker = EdgeTTSWorker()
+        # 连接信号槽
+        self.edge_tts_worker.voices_fetched.connect(self.on_voices_fetched)
+        self.edge_tts_worker.error_occurred.connect(self.on_voices_fetch_error)
+        # 启动worker
+        self.edge_tts_worker.start()
+
+    def on_voices_fetched(self, voices):
+        """语音列表获取成功后的处理"""
         try:
-            # 尝试获取当前事件循环
-            try:
-                loop = asyncio.get_event_loop()
-                if loop.is_running():
-                    # 如果循环正在运行，使用QTimer.singleShot创建任务
-                    QTimer.singleShot(
-                        0,
-                        lambda: asyncio.create_task(
-                            self._update_edge_tts_voices_task()
-                        ),
-                    )
-                else:
-                    # 如果循环没有运行，直接创建任务
-                    loop.create_task(self._update_edge_tts_voices_task())
-            except RuntimeError:
-                # 如果没有事件循环，创建一个新的
-                loop = asyncio.new_event_loop()
-                asyncio.set_event_loop(loop)
-                loop.create_task(self._update_edge_tts_voices_task())
-        except Exception as e:
-            logger.error(f"创建Edge TTS语音更新任务失败: {e}")
-            self._is_updating_voices = False
-
-    async def _update_edge_tts_voices_task(self):
-        """异步更新Edge TTS语音列表的任务"""
-        try:
-            # 获取最新的语音列表
-            voices = await self._get_edge_tts_voices()
-            # 获取当前选中的语音
-            current_voice = self.edge_tts_voice_name.currentText()
-
-            # 使用信号槽机制在主线程中更新UI
-            self._update_voice_combo_box(voices, current_voice)
-        except Exception as e:
-            logger.error(f"更新Edge TTS语音列表失败: {e}")
-        finally:
-            # 无论成功或失败，都要重置更新标志
-            self._is_updating_voices = False
-
-    @Slot(list, str)
-    def _update_voice_combo_box(self, voices, current_voice):
-        """在主线程中更新语音列表下拉框"""
-        try:
+            # 保存当前选中的语音
+            current_voice = self.edge_tts_voiceComboBox.currentText()
             # 清空当前列表
-            self.edge_tts_voice_name.clear()
+            self.edge_tts_voiceComboBox.clear()
             # 添加新的语音列表
-            self.edge_tts_voice_name.addItems([v["id"] for v in voices])
+            voice_ids = [v["id"] for v in voices]
+            self.edge_tts_voiceComboBox.addItems(voice_ids)
+
             # 尝试恢复之前选中的语音
-            index = self.edge_tts_voice_name.findText(current_voice)
-            if index >= 0:
-                self.edge_tts_voice_name.setCurrentIndex(index)
-            else:
-                # 如果找不到之前选中的语音，使用默认语音
-                self.edge_tts_voice_name.setCurrentText("zh-CN-XiaoxiaoNeural")
+            if current_voice in voice_ids:
+                self.edge_tts_voiceComboBox.setCurrentText(current_voice)
+            elif voice_ids:
+                # 如果之前的语音不存在，选择第一个
+                self.edge_tts_voiceComboBox.setCurrentIndex(0)
 
             logger.info(f"Edge TTS语音列表已更新，共{len(voices)}个语音")
         except Exception as e:
-            logger.error(f"更新语音列表下拉框失败: {e}")
+            logger.error(f"处理Edge TTS语音列表失败: {e}")
 
-    async def _get_edge_tts_voices(self):
-        """获取Edge TTS语音列表"""
-        max_retries = 3
-        retry_delay = 2  # 秒
+    def on_voices_fetch_error(self, error):
+        """语音列表获取失败后的处理"""
+        logger.error(f"获取Edge TTS语音列表失败: {error}")
 
-        for attempt in range(max_retries):
-            try:
-                voices = await edge_tts.list_voices()
-                filtered_voices = [
-                    {
-                        "name": v["FriendlyName"],
-                        "id": v["ShortName"]
-                        if not v["Locale"].startswith("zh-CN")
-                        else f"zh-CN-{v['FriendlyName'].split()[1]}Neural",
-                        "languages": v["Locale"].replace("_", "-"),
-                        "full_info": f"{v['Gender']} | {v['Locale']} | Type: {v.get('VoiceType', 'Unknown')}",
-                    }
-                    for v in voices
-                    if v["Locale"]
-                ]
-                return filtered_voices
-            except (aiohttp.ClientError, aiohttp.ClientResponseError) as e:
-                if attempt < max_retries - 1:
-                    logger.error(
-                        f"Edge TTS服务连接失败，第{attempt + 1}次重试中... 错误: {str(e)!r}"
-                    )
-                    await asyncio.sleep(retry_delay)
-                    continue
-                else:
-                    logger.error(
-                        f"Edge TTS服务连接失败，已重试{max_retries}次: {str(e)!r}"
-                    )
-            except KeyError as e:
-                logger.error(f"Edge TTS语音解析失败: {str(e)!r}")
-                break
-            except Exception as e:
-                if attempt < max_retries - 1:
-                    logger.error(
-                        f"Edge TTS语音获取失败，第{attempt + 1}次重试中... 错误: {str(e)!r}"
-                    )
-                    await asyncio.sleep(retry_delay)
-                    continue
-                else:
-                    logger.error(f"Edge TTS语音解析失败: {str(e)!r}")
-
-        # 所有尝试都失败后，返回默认语音列表
-        return self._get_default_voices()
-
-    def _get_default_voices(self):
-        """获取默认语音列表"""
-        default_voices = [
-            {
-                "name": "Xiaoxiao",
-                "id": "zh-CN-XiaoxiaoNeural",
-                "languages": "zh-CN",
-                "full_info": "Female | zh-CN | Type: Neural",
-            },
-            {
-                "name": "Yunxi",
-                "id": "zh-CN-YunxiNeural",
-                "languages": "zh-CN",
-                "full_info": "Male | zh-CN | Type: Neural",
-            },
-            {
-                "name": "Xiaoyi",
-                "id": "zh-CN-XiaoyiNeural",
-                "languages": "zh-CN",
-                "full_info": "Female | zh-CN | Type: Neural",
-            },
-            {
-                "name": "Jenny",
-                "id": "en-US-JennyNeural",
-                "languages": "en-US",
-                "full_info": "Female | en-US | Type: Neural",
-            },
-            {
-                "name": "Guy",
-                "id": "en-US-GuyNeural",
-                "languages": "en-US",
-                "full_info": "Male | en-US | Type: Neural",
-            },
-        ]
-        logger.info("Edge TTS服务不可用，使用默认语音列表")
-        return default_voices
+    def __del__(self):
+        """析构函数，确保worker正确终止"""
+        if self.edge_tts_worker:
+            self.edge_tts_worker.terminate()
+            self.edge_tts_worker.wait()
+            del self.edge_tts_worker
 
 
 class basic_settings_volume(GroupHeaderCardWidget):
@@ -306,23 +197,6 @@ class basic_settings_volume(GroupHeaderCardWidget):
             lambda value: update_settings("basic_voice_settings", "volume_size", value)
         )
 
-        # 添加设置项到分组
-        self.addGroup(
-            get_theme_icon("ic_fluent_speaker_edit_20_filled"),
-            get_content_name_async("basic_voice_settings", "volume_size"),
-            get_content_description_async("basic_voice_settings", "volume_size"),
-            self.volume_size,
-        )
-
-
-class basic_settings_system_volume(GroupHeaderCardWidget):
-    def __init__(self, parent=None):
-        super().__init__(parent)
-        self.setTitle(
-            get_content_name_async("basic_voice_settings", "system_volume_group")
-        )
-        self.setBorderRadius(8)
-
         # 系统音量大小设置
         self.system_volume_size = SpinBox()
         self.system_volume_size.setFixedWidth(WIDTH_SPINBOX)
@@ -338,6 +212,12 @@ class basic_settings_system_volume(GroupHeaderCardWidget):
         )
 
         # 添加设置项到分组
+        self.addGroup(
+            get_theme_icon("ic_fluent_speaker_edit_20_filled"),
+            get_content_name_async("basic_voice_settings", "volume_size"),
+            get_content_description_async("basic_voice_settings", "volume_size"),
+            self.volume_size,
+        )
         self.addGroup(
             get_theme_icon("ic_fluent_speaker_edit_20_filled"),
             get_content_name_async("basic_voice_settings", "system_volume_size"),
