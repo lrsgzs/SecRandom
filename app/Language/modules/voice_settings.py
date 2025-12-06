@@ -115,3 +115,48 @@ basic_voice_settings = {
         },
     },
 }
+
+specific_announcements = {
+    "ZH_CN": {
+        "title": {"name": "特定播报设置", "description": "配置特定结果的语音播报"},
+        "enabled": {"name": "开关", "description": "开启或关闭语音播报功能"},
+        "mode": {
+            "name": "播报模式",
+            "description": "选择语音播报的模式",
+            "combo_items": ["点名模式", "抽奖模式"],
+        },
+        "roll_call_title": {
+            "name": "点名模式配置",
+            "description": "配置点名模式下的语音播报",
+        },
+        "select_class_name": {
+            "name": "选择班级/奖池",
+            "description": "选择要管理TTS的班级或奖池",
+        },
+        "id_field": {"name": "学号", "description": "是否在播报中包含学号"},
+        "name_field": {"name": "姓名", "description": "是否在播报中包含姓名"},
+        "prefix_field": {"name": "播报前缀", "description": "在播报内容前添加的文本"},
+        "suffix_field": {"name": "播报后缀", "description": "在播报内容后添加的文本"},
+        "lottery_title": {
+            "name": "抽奖模式配置",
+            "description": "配置抽奖模式下的语音播报",
+        },
+        "lottery_id_field": {"name": "序号", "description": "是否在播报中包含序号"},
+        "lottery_name_field": {
+            "name": "名称",
+            "description": "是否在播报中包含名称",
+        },
+        "lottery_prefix_field": {
+            "name": "抽奖前缀",
+            "description": "在播报内容前添加的文本",
+        },
+        "lottery_suffix_field": {
+            "name": "抽奖后缀",
+            "description": "在播报内容后添加的文本",
+        },
+        "tts_alias": {
+            "name": "替换名称",
+            "description": "用于TTS发音的替换名称，留空则使用默认发音",
+        },
+    },
+}

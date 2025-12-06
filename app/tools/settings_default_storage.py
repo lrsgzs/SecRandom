@@ -445,6 +445,17 @@ DEFAULT_SETTINGS = {
         "speech_rate": {"default_value": 100},
         "system_volume_size": {"default_value": 80},
     },
+    "specific_announcements": {
+        "title": {"default_value": None},
+        "enabled": {"default_value": True},
+        "default_mode": {"default_value": 0},
+        "roll_call_fields": {
+            "default_value": {"id": True, "name": True, "prefix": "", "suffix": ""}
+        },
+        "lottery_fields": {
+            "default_value": {"id": True, "name": True, "prefix": "", "suffix": ""}
+        },
+    },
     "history": {"title": {"default_value": None}},
     "history_management": {
         "title": {"default_value": None},

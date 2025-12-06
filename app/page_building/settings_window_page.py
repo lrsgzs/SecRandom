@@ -111,7 +111,9 @@ class voice_settings_page(PivotPageTemplate):
             "basic_voice_settings": get_content_name_async(
                 "basic_voice_settings", "title"
             ),
-            # "specific_announcements": get_content_name_async("specific_announcements", "title")
+            "specific_announcements": get_content_name_async(
+                "specific_announcements", "title"
+            ),
         }
         super().__init__(page_config, parent)
         self.set_base_path("app.view.settings.voice_settings")

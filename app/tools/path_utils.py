@@ -204,7 +204,10 @@ class PathGetter:
         Returns:
             Path: 音频文件的绝对路径
         """
-        return self._path_manager.get_absolute_path(f"data/audio/{filename}")
+        if filename:
+            return self._path_manager.get_absolute_path(f"data/audio/{filename}")
+        else:
+            return self._path_manager.get_absolute_path("data/audio")
 
     def get_font_path(self, filename: str = DEFAULT_FONT_FILENAME_PRIMARY) -> Path:
         """获取字体文件路径
@@ -426,7 +429,7 @@ def get_temp_path(filename: str = "") -> Path:
     return path_getter.get_temp_path(filename)
 
 
-def get_audio_path(filename: str) -> Path:
+def get_audio_path(filename: str = "") -> Path:
     """获取音频文件路径的便捷函数
 
     Args:
