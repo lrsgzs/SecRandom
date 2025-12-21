@@ -203,6 +203,7 @@ class PivotPageTemplate(QFrame):
         self.current_page = None  # 当前页面
         self.base_path = "app.view.settings.list_management"  # 默认基础路径
         self._page_load_order = []  # 页面加载顺序，用于LRU卸载
+        self.MAX_CACHED_PAGES = MAX_CACHED_PAGES  # 最大同时保留在内存中的页面数量
 
         self.__connectSignalToSlot()
 
