@@ -835,7 +835,7 @@ class SettingsWindow(FluentWindow):
             # 先创建页面内容
             if "basicSettingsInterface" in getattr(self, "_deferred_factories", {}):
                 self._create_deferred_page("basicSettingsInterface")
-            
+
             # 然后切换到该页面
             if hasattr(self, "basicSettingsInterface") and self.basicSettingsInterface:
                 self.switchTo(self.basicSettingsInterface)

@@ -186,9 +186,6 @@ class PivotPageTemplate(QFrame):
     - 支持按需重新加载
     """
 
-    # 最大同时保留在内存中的页面数量
-    MAX_CACHED_PAGES = 1
-
     def __init__(self, page_config: dict, parent: QFrame = None):
         """
         初始化 Pivot 页面模板
