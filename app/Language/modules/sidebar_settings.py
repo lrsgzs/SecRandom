@@ -20,20 +20,20 @@ sidebar_management_settings = {
             "description": "设置抽取设置项在侧边栏位置",
             "combo_items": ["顶部", "底部", "不显示"],
         },
+        "floating_window": {
+            "name": "浮窗管理",
+            "description": "设置浮窗管理项在侧边栏位置",
+            "combo_items": ["顶部", "底部", "不显示"],
+        },
         "notification_service": {
-            "name": "通知服务",
-            "description": "设置通知服务项在侧边栏位置",
+            "name": "通知设置",
+            "description": "设置通知设置项在侧边栏位置",
             "combo_items": ["顶部", "底部", "不显示"],
         },
         "security_settings": {
             "name": "安全设置",
             "description": "设置安全设置项在侧边栏位置",
             "combo_items": ["顶部", "底部", "不显示"],
-        },
-        "personal_settings": {
-            "name": "个性设置",
-            "description": "设置个性设置项在侧边栏位置",
-            "combo_items": ["顶部", "底部"],
         },
         "voice_settings": {
             "name": "语音设置",
@@ -48,6 +48,11 @@ sidebar_management_settings = {
         "more_settings": {
             "name": "更多设置",
             "description": "设置更多设置项在侧边栏位置",
+            "combo_items": ["顶部", "底部", "不显示"],
+        },
+        "update_settings": {
+            "name": "更新设置",
+            "description": "设置更新设置项在侧边栏位置",
             "combo_items": ["顶部", "底部", "不显示"],
         },
     }
