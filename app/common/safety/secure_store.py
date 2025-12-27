@@ -23,9 +23,14 @@ def _set_hidden(path: str) -> None:
             # Windows 平台：设置文件属性为隐藏和系统文件
             FILE_ATTRIBUTE_HIDDEN = 0x2
             FILE_ATTRIBUTE_SYSTEM = 0x4
-            ctypes.windll.kernel32.SetFileAttributesW(
+            # 确保路径是Unicode字符串
+            result = ctypes.windll.kernel32.SetFileAttributesW(
                 path, FILE_ATTRIBUTE_HIDDEN | FILE_ATTRIBUTE_SYSTEM
             )
+            if result == 0:  # 函数失败
+                logger.warning(
+                    f"设置Windows文件属性失败，错误码: {ctypes.windll.kernel32.GetLastError()}"
+                )
         else:  # Linux 平台：使用点前缀隐藏文件
             import os
 
