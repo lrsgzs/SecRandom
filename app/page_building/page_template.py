@@ -38,6 +38,7 @@ class PageTemplate(QFrame):
         self.content_created = False
         self.content_widget_class = content_widget_class
         self._is_preview_mode = is_preview_mode
+        self._content_kwargs = kwargs  # 存储传递给内容组件的额外参数
 
         self.__connectSignalToSlot()
         self.create_ui_components()
@@ -149,7 +150,8 @@ class PageTemplate(QFrame):
             # 如果内容组件尚未创建，创建并添加到布局
             if not self.content_created:
                 # 实例化并添加到延迟创建的布局
-                self.contentWidget = content_cls(self)
+                # 传递额外参数给内容组件构造函数
+                self.contentWidget = content_cls(self, **self._content_kwargs)
                 self._inner_layout_lazy.addWidget(self.contentWidget)
                 self.content_created = True
 

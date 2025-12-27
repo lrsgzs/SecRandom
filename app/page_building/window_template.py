@@ -304,7 +304,7 @@ class SimpleWindowTemplate(FramelessWindow):
             raise
 
     def add_page_from_template(
-        self, page_name: str, page_class: Type
+        self, page_name: str, page_class: Type, **kwargs
     ) -> Optional[QWidget]:
         """
         从页面模板添加页面
@@ -312,8 +312,7 @@ class SimpleWindowTemplate(FramelessWindow):
         Args:
             page_name: 页面名称（唯一标识）
             page_class: 页面类
-            width: 页面宽度
-            height: 页面高度
+            **kwargs: 传递给页面类构造函数的额外参数
 
         Returns:
             页面实例，如果创建失败则返回None
@@ -328,8 +327,8 @@ class SimpleWindowTemplate(FramelessWindow):
             return self.page_instances[page_name]
 
         try:
-            # 创建页面实例
-            page_instance = page_class(self)
+            # 创建页面实例，传递额外参数
+            page_instance = page_class(self, **kwargs)
 
             # 设置对象名称
             page_instance.setObjectName(page_name)

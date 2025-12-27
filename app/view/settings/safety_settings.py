@@ -51,6 +51,37 @@ class safety_settings(QWidget):
         self.security_operations_widget = basic_safety_security_operations(self)
         self.vBoxLayout.addWidget(self.security_operations_widget)
 
+        # 初始化时根据安全总开关状态更新所有组件的启用状态
+        self._update_all_security_components_enabled_state()
+
+        # 连接安全总开关状态变化信号
+        get_settings_signals().settingChanged.connect(self._on_global_setting_changed)
+
+    def _update_all_security_components_enabled_state(self):
+        """更新所有安全相关组件的启用状态"""
+        # 获取安全总开关状态
+        safety_enabled = readme_settings_async("basic_safety_settings", "safety_switch")
+
+        # 更新验证方式组件
+        self.verification_method_widget._update_components_enabled_state_based_on_global(
+            safety_enabled
+        )
+
+        # 更新验证流程组件
+        self.verification_process_widget._update_enabled_state(safety_enabled)
+
+        # 更新安全操作组件
+        self.security_operations_widget._update_enabled_state(safety_enabled)
+
+    def _on_global_setting_changed(self, first_level_key, second_level_key, value):
+        """全局设置变化时的处理"""
+        if (
+            first_level_key == "basic_safety_settings"
+            and second_level_key == "safety_switch"
+        ):
+            # 安全总开关状态变化时，更新所有安全相关组件的启用状态
+            self._update_all_security_components_enabled_state()
+
 
 class basic_safety_verification_method(GroupHeaderCardWidget):
     def __init__(self, parent=None):
@@ -217,6 +248,9 @@ class basic_safety_verification_method(GroupHeaderCardWidget):
             self.bind_usb_button.setEnabled(False)
             self.unbind_usb_button.setEnabled(False)
 
+        # 初始化时根据总开关状态更新组件启用状态
+        self._update_components_enabled_state()
+
         get_settings_signals().settingChanged.connect(self.__on_setting_changed)
 
     def _notify_error(self, text: str, duration: int = 3000):
@@ -296,30 +330,40 @@ class basic_safety_verification_method(GroupHeaderCardWidget):
         require_and_run("unbind_usb", self, create_unbind_usb_window)
 
     def __on_safety_switch_changed(self):
-        if self.safety_switch.isChecked() and not password_is_configured():
-            self.safety_switch.setChecked(False)
-            update_settings("basic_safety_settings", "safety_switch", False)
-            self._notify_error(
-                get_content_name_async(
-                    "basic_safety_settings", "error_set_password_first"
-                )
-            )
+        if self._busy:
             return
-        desired = bool(self.safety_switch.isChecked())
-        prev = bool(readme_settings_async("basic_safety_settings", "safety_switch"))
+        self._busy = True
+        try:
+            if self.safety_switch.isChecked() and not password_is_configured():
+                self.safety_switch.setChecked(False)
+                update_settings("basic_safety_settings", "safety_switch", False)
+                self._notify_error(
+                    get_content_name_async(
+                        "basic_safety_settings", "error_set_password_first"
+                    )
+                )
+                # 更新其他组件的启用状态
+                self._update_components_enabled_state()
+                return
+            desired = bool(self.safety_switch.isChecked())
+            prev = bool(readme_settings_async("basic_safety_settings", "safety_switch"))
 
-        # 恢复之前的状态，等待验证通过后再执行实际变更
-        self._set_switch(self.safety_switch, "safety_switch", prev)
+            # 恢复之前的状态，等待验证通过后再执行实际变更
+            self._set_switch(self.safety_switch, "safety_switch", prev)
 
-        def apply():
-            self._set_switch(self.safety_switch, "safety_switch", desired)
-            try:
-                self._persist_basic_safety("safety_switch", desired)
-            except Exception:
-                pass
-            logger.debug(f"安全总开关状态：{bool(desired)}")
+            def apply():
+                self._set_switch(self.safety_switch, "safety_switch", desired)
+                try:
+                    self._persist_basic_safety("safety_switch", desired)
+                except Exception:
+                    pass
+                # 更新其他组件的启用状态
+                self._update_components_enabled_state()
+                logger.debug(f"安全总开关状态：{bool(desired)}")
 
-        require_and_run("toggle_safety", self, apply)
+            require_and_run("toggle_safety", self, apply)
+        finally:
+            self._busy = False
 
     def __on_totp_switch_changed(self):
         if self._busy:
@@ -415,29 +459,83 @@ class basic_safety_verification_method(GroupHeaderCardWidget):
         finally:
             self._busy = False
 
+    def _update_components_enabled_state(self):
+        """根据安全总开关状态更新其他组件的启用状态（内部方法）"""
+        safety_enabled = self.safety_switch.isChecked()
+        password_configured = password_is_configured()
+
+        # 总开关关闭时，禁用除总开关外的所有安全相关组件
+        if not safety_enabled:
+            self.totp_switch.setEnabled(False)
+            self.set_totp_button.setEnabled(False)
+            self.usb_switch.setEnabled(False)
+            self.bind_usb_button.setEnabled(False)
+            self.unbind_usb_button.setEnabled(False)
+        else:
+            # 总开关开启时，根据密码配置状态决定其他组件是否启用
+            self.totp_switch.setEnabled(password_configured)
+            self.set_totp_button.setEnabled(True)  # 设置密码按钮始终可用
+            self.usb_switch.setEnabled(password_configured)
+            self.bind_usb_button.setEnabled(password_configured)
+            self.unbind_usb_button.setEnabled(password_configured)
+
+    def _update_components_enabled_state_based_on_global(self, global_safety_enabled):
+        """根据全局安全总开关状态更新组件的启用状态"""
+        password_configured = password_is_configured()
+
+        # 如果全局安全总开关关闭，禁用除总开关外的所有安全相关组件
+        if not global_safety_enabled:
+            self.totp_switch.setEnabled(False)
+            self.set_totp_button.setEnabled(False)  # 即使是设置密码按钮也禁用
+            self.usb_switch.setEnabled(False)
+            self.bind_usb_button.setEnabled(False)
+            self.unbind_usb_button.setEnabled(False)
+        else:
+            # 全局安全总开关开启时，根据密码配置状态决定其他组件是否启用
+            self.totp_switch.setEnabled(password_configured)
+            self.set_totp_button.setEnabled(
+                True
+            )  # 设置密码按钮始终可用（当全局安全开启时）
+            self.usb_switch.setEnabled(password_configured)
+            self.bind_usb_button.setEnabled(password_configured)
+            self.unbind_usb_button.setEnabled(password_configured)
+
     def __on_setting_changed(self, first_level_key, second_level_key, value):
         if first_level_key != "basic_safety_settings":
             return
+
+        if self._busy:
+            return
+
         # 只在状态不同时才更新，避免不必要的信号触发
         if (
             second_level_key == "safety_switch"
             and self.safety_switch.isChecked() != bool(value)
         ):
+            self.safety_switch.blockSignals(True)
             self.safety_switch.setChecked(bool(value))
+            self.safety_switch.blockSignals(False)
+            # 安全总开关状态改变时，更新其他组件的启用状态
+            self._update_components_enabled_state()
         elif second_level_key == "totp_switch" and self.totp_switch.isChecked() != bool(
             value
         ):
+            self.totp_switch.blockSignals(True)
             self.totp_switch.setChecked(bool(value))
+            self.totp_switch.blockSignals(False)
         elif second_level_key == "usb_switch" and self.usb_switch.isChecked() != bool(
             value
         ):
+            self.usb_switch.blockSignals(True)
             self.usb_switch.setChecked(bool(value))
+            self.usb_switch.blockSignals(False)
+
         enabled = password_is_configured()
-        self.totp_switch.setEnabled(enabled)
-        self.set_totp_button.setEnabled(enabled)
-        self.usb_switch.setEnabled(enabled)
-        self.bind_usb_button.setEnabled(enabled)
-        self.unbind_usb_button.setEnabled(enabled)
+        self.totp_switch.setEnabled(enabled and self.safety_switch.isChecked())
+        self.set_totp_button.setEnabled(self.safety_switch.isChecked())
+        self.usb_switch.setEnabled(enabled and self.safety_switch.isChecked())
+        self.bind_usb_button.setEnabled(enabled and self.safety_switch.isChecked())
+        self.unbind_usb_button.setEnabled(enabled and self.safety_switch.isChecked())
 
 
 class basic_safety_verification_process(GroupHeaderCardWidget):
@@ -492,6 +590,10 @@ class basic_safety_verification_process(GroupHeaderCardWidget):
             self.verification_process_combo.blockSignals(False)
 
         require_and_run("change_verification_process", self, apply)
+
+    def _update_enabled_state(self, enabled):
+        """根据安全总开关状态更新组件的启用状态"""
+        self.verification_process_combo.setEnabled(enabled)
 
 
 class basic_safety_security_operations(GroupHeaderCardWidget):
@@ -764,51 +866,70 @@ class basic_safety_security_operations(GroupHeaderCardWidget):
         if first_level_key != "basic_safety_settings":
             return
         self._ensure_ops_disabled_if_no_password()
+
         # 只在状态不同时才更新，避免不必要的信号触发
         if (
             second_level_key == "show_hide_floating_window_switch"
             and self.show_hide_floating_window_switch.isChecked() != bool(value)
         ):
+            self.show_hide_floating_window_switch.blockSignals(True)
             self.show_hide_floating_window_switch.setChecked(bool(value))
+            self.show_hide_floating_window_switch.blockSignals(False)
         elif (
             second_level_key == "restart_switch"
             and self.restart_switch.isChecked() != bool(value)
         ):
+            self.restart_switch.blockSignals(True)
             self.restart_switch.setChecked(bool(value))
+            self.restart_switch.blockSignals(False)
         elif second_level_key == "exit_switch" and self.exit_switch.isChecked() != bool(
             value
         ):
+            self.exit_switch.blockSignals(True)
             self.exit_switch.setChecked(bool(value))
+            self.exit_switch.blockSignals(False)
         elif (
             second_level_key == "open_settings_switch"
             and self.open_settings_switch.isChecked() != bool(value)
         ):
+            self.open_settings_switch.blockSignals(True)
             self.open_settings_switch.setChecked(bool(value))
+            self.open_settings_switch.blockSignals(False)
         elif (
             second_level_key == "diagnostic_export_switch"
             and self.diagnostic_export_switch.isChecked() != bool(value)
         ):
+            self.diagnostic_export_switch.blockSignals(True)
             self.diagnostic_export_switch.setChecked(bool(value))
+            self.diagnostic_export_switch.blockSignals(False)
         elif (
             second_level_key == "data_export_switch"
             and self.data_export_switch.isChecked() != bool(value)
         ):
+            self.data_export_switch.blockSignals(True)
             self.data_export_switch.setChecked(bool(value))
+            self.data_export_switch.blockSignals(False)
         elif (
             second_level_key == "import_overwrite_switch"
             and self.import_overwrite_switch.isChecked() != bool(value)
         ):
+            self.import_overwrite_switch.blockSignals(True)
             self.import_overwrite_switch.setChecked(bool(value))
+            self.import_overwrite_switch.blockSignals(False)
         elif (
             second_level_key == "import_version_mismatch_switch"
             and self.import_version_mismatch_switch.isChecked() != bool(value)
         ):
+            self.import_version_mismatch_switch.blockSignals(True)
             self.import_version_mismatch_switch.setChecked(bool(value))
+            self.import_version_mismatch_switch.blockSignals(False)
         elif (
             second_level_key == "preview_settings_switch"
             and self.preview_settings_switch.isChecked() != bool(value)
         ):
+            self.preview_settings_switch.blockSignals(True)
             self.preview_settings_switch.setChecked(bool(value))
+            self.preview_settings_switch.blockSignals(False)
 
     def _ensure_ops_disabled_if_no_password(self):
         enabled = password_is_configured()
@@ -847,261 +968,355 @@ class basic_safety_security_operations(GroupHeaderCardWidget):
                     pass
 
     def __on_ops_show_hide_changed(self):
-        if not password_is_configured():
-            try:
-                self.show_hide_floating_window_switch.blockSignals(True)
-                self.show_hide_floating_window_switch.setChecked(False)
-                self.show_hide_floating_window_switch.blockSignals(False)
-                update_settings(
-                    "basic_safety_settings", "show_hide_floating_window_switch", False
-                )
-            except Exception:
-                pass
+        if self._busy:
             return
-        desired = bool(self.show_hide_floating_window_switch.isChecked())
-        prev = bool(
-            readme_settings_async(
-                "basic_safety_settings", "show_hide_floating_window_switch"
+        self._busy = True
+        try:
+            if not password_is_configured():
+                try:
+                    self.show_hide_floating_window_switch.blockSignals(True)
+                    self.show_hide_floating_window_switch.setChecked(False)
+                    self.show_hide_floating_window_switch.blockSignals(False)
+                    update_settings(
+                        "basic_safety_settings",
+                        "show_hide_floating_window_switch",
+                        False,
+                    )
+                except Exception:
+                    pass
+                return
+            desired = bool(self.show_hide_floating_window_switch.isChecked())
+            prev = bool(
+                readme_settings_async(
+                    "basic_safety_settings", "show_hide_floating_window_switch"
+                )
             )
-        )
-        self.show_hide_floating_window_switch.blockSignals(True)
-        self.show_hide_floating_window_switch.setChecked(prev)
-        self.show_hide_floating_window_switch.blockSignals(False)
+            self.show_hide_floating_window_switch.blockSignals(True)
+            self.show_hide_floating_window_switch.setChecked(prev)
+            self.show_hide_floating_window_switch.blockSignals(False)
 
-        def apply():
-            update_settings(
-                "basic_safety_settings",
-                "show_hide_floating_window_switch",
-                desired,
-            )
+            def apply():
+                update_settings(
+                    "basic_safety_settings",
+                    "show_hide_floating_window_switch",
+                    desired,
+                )
 
-        require_and_run("toggle_show_hide_floating_window_switch", self, apply)
+            require_and_run("toggle_show_hide_floating_window_switch", self, apply)
+        finally:
+            self._busy = False
 
     def __on_ops_restart_changed(self):
-        if not password_is_configured():
-            try:
-                self.restart_switch.blockSignals(True)
-                self.restart_switch.setChecked(False)
-                self.restart_switch.blockSignals(False)
-                update_settings("basic_safety_settings", "restart_switch", False)
-            except Exception:
-                pass
+        if self._busy:
             return
-        desired = bool(self.restart_switch.isChecked())
-        prev = bool(readme_settings_async("basic_safety_settings", "restart_switch"))
-        self.restart_switch.blockSignals(True)
-        self.restart_switch.setChecked(prev)
-        self.restart_switch.blockSignals(False)
-
-        def apply():
-            update_settings(
-                "basic_safety_settings",
-                "restart_switch",
-                desired,
+        self._busy = True
+        try:
+            if not password_is_configured():
+                try:
+                    self.restart_switch.blockSignals(True)
+                    self.restart_switch.setChecked(False)
+                    self.restart_switch.blockSignals(False)
+                    update_settings("basic_safety_settings", "restart_switch", False)
+                except Exception:
+                    pass
+                return
+            desired = bool(self.restart_switch.isChecked())
+            prev = bool(
+                readme_settings_async("basic_safety_settings", "restart_switch")
             )
+            self.restart_switch.blockSignals(True)
+            self.restart_switch.setChecked(prev)
+            self.restart_switch.blockSignals(False)
 
-        require_and_run("toggle_restart_switch", self, apply)
+            def apply():
+                update_settings(
+                    "basic_safety_settings",
+                    "restart_switch",
+                    desired,
+                )
+
+            require_and_run("toggle_restart_switch", self, apply)
+        finally:
+            self._busy = False
 
     def __on_ops_exit_changed(self):
-        if not password_is_configured():
-            try:
-                self.exit_switch.blockSignals(True)
-                self.exit_switch.setChecked(False)
-                self.exit_switch.blockSignals(False)
-                update_settings("basic_safety_settings", "exit_switch", False)
-            except Exception:
-                pass
+        if self._busy:
             return
-        desired = bool(self.exit_switch.isChecked())
-        prev = bool(readme_settings_async("basic_safety_settings", "exit_switch"))
-        self.exit_switch.blockSignals(True)
-        self.exit_switch.setChecked(prev)
-        self.exit_switch.blockSignals(False)
+        self._busy = True
+        try:
+            if not password_is_configured():
+                try:
+                    self.exit_switch.blockSignals(True)
+                    self.exit_switch.setChecked(False)
+                    self.exit_switch.blockSignals(False)
+                    update_settings("basic_safety_settings", "exit_switch", False)
+                except Exception:
+                    pass
+                return
+            desired = bool(self.exit_switch.isChecked())
+            prev = bool(readme_settings_async("basic_safety_settings", "exit_switch"))
+            self.exit_switch.blockSignals(True)
+            self.exit_switch.setChecked(prev)
+            self.exit_switch.blockSignals(False)
 
-        def apply():
-            update_settings(
-                "basic_safety_settings",
-                "exit_switch",
-                desired,
-            )
+            def apply():
+                update_settings(
+                    "basic_safety_settings",
+                    "exit_switch",
+                    desired,
+                )
 
-        require_and_run("toggle_exit_switch", self, apply)
+            require_and_run("toggle_exit_switch", self, apply)
+        finally:
+            self._busy = False
 
     def __on_ops_open_settings_changed(self):
-        if not password_is_configured():
-            try:
-                self.open_settings_switch.blockSignals(True)
-                self.open_settings_switch.setChecked(False)
-                self.open_settings_switch.blockSignals(False)
-                update_settings("basic_safety_settings", "open_settings_switch", False)
-            except Exception:
-                pass
+        if self._busy:
             return
-        desired = bool(self.open_settings_switch.isChecked())
-        prev = bool(
-            readme_settings_async("basic_safety_settings", "open_settings_switch")
-        )
-        self.open_settings_switch.blockSignals(True)
-        self.open_settings_switch.setChecked(prev)
-        self.open_settings_switch.blockSignals(False)
-
-        def apply():
-            update_settings(
-                "basic_safety_settings",
-                "open_settings_switch",
-                desired,
+        self._busy = True
+        try:
+            if not password_is_configured():
+                try:
+                    self.open_settings_switch.blockSignals(True)
+                    self.open_settings_switch.setChecked(False)
+                    self.open_settings_switch.blockSignals(False)
+                    update_settings(
+                        "basic_safety_settings", "open_settings_switch", False
+                    )
+                except Exception:
+                    pass
+                return
+            desired = bool(self.open_settings_switch.isChecked())
+            prev = bool(
+                readme_settings_async("basic_safety_settings", "open_settings_switch")
             )
+            self.open_settings_switch.blockSignals(True)
+            self.open_settings_switch.setChecked(prev)
+            self.open_settings_switch.blockSignals(False)
 
-        require_and_run("toggle_open_settings_switch", self, apply)
+            def apply():
+                update_settings(
+                    "basic_safety_settings",
+                    "open_settings_switch",
+                    desired,
+                )
+
+            require_and_run("toggle_open_settings_switch", self, apply)
+        finally:
+            self._busy = False
 
     def __on_ops_diagnostic_export_changed(self):
-        if not password_is_configured():
-            try:
-                self.diagnostic_export_switch.blockSignals(True)
-                self.diagnostic_export_switch.setChecked(False)
-                self.diagnostic_export_switch.blockSignals(False)
-                update_settings(
-                    "basic_safety_settings", "diagnostic_export_switch", False
-                )
-            except Exception:
-                pass
+        if self._busy:
             return
-        desired = bool(self.diagnostic_export_switch.isChecked())
-        prev = bool(
-            readme_settings_async("basic_safety_settings", "diagnostic_export_switch")
-        )
-        self.diagnostic_export_switch.blockSignals(True)
-        self.diagnostic_export_switch.setChecked(prev)
-        self.diagnostic_export_switch.blockSignals(False)
-
-        def apply():
-            update_settings(
-                "basic_safety_settings",
-                "diagnostic_export_switch",
-                desired,
+        self._busy = True
+        try:
+            if not password_is_configured():
+                try:
+                    self.diagnostic_export_switch.blockSignals(True)
+                    self.diagnostic_export_switch.setChecked(False)
+                    self.diagnostic_export_switch.blockSignals(False)
+                    update_settings(
+                        "basic_safety_settings", "diagnostic_export_switch", False
+                    )
+                except Exception:
+                    pass
+                return
+            desired = bool(self.diagnostic_export_switch.isChecked())
+            prev = bool(
+                readme_settings_async(
+                    "basic_safety_settings", "diagnostic_export_switch"
+                )
             )
+            self.diagnostic_export_switch.blockSignals(True)
+            self.diagnostic_export_switch.setChecked(prev)
+            self.diagnostic_export_switch.blockSignals(False)
 
-        require_and_run("toggle_diagnostic_export_switch", self, apply)
+            def apply():
+                update_settings(
+                    "basic_safety_settings",
+                    "diagnostic_export_switch",
+                    desired,
+                )
+
+            require_and_run("toggle_diagnostic_export_switch", self, apply)
+        finally:
+            self._busy = False
 
     def __on_ops_data_export_changed(self):
-        if not password_is_configured():
-            try:
-                self.data_export_switch.blockSignals(True)
-                self.data_export_switch.setChecked(False)
-                self.data_export_switch.blockSignals(False)
-                update_settings("basic_safety_settings", "data_export_switch", False)
-            except Exception:
-                pass
+        if self._busy:
             return
-        desired = bool(self.data_export_switch.isChecked())
-        prev = bool(
-            readme_settings_async("basic_safety_settings", "data_export_switch")
-        )
-        self.data_export_switch.blockSignals(True)
-        self.data_export_switch.setChecked(prev)
-        self.data_export_switch.blockSignals(False)
-
-        def apply():
-            update_settings(
-                "basic_safety_settings",
-                "data_export_switch",
-                desired,
+        self._busy = True
+        try:
+            if not password_is_configured():
+                try:
+                    self.data_export_switch.blockSignals(True)
+                    self.data_export_switch.setChecked(False)
+                    self.data_export_switch.blockSignals(False)
+                    update_settings(
+                        "basic_safety_settings", "data_export_switch", False
+                    )
+                except Exception:
+                    pass
+                return
+            desired = bool(self.data_export_switch.isChecked())
+            prev = bool(
+                readme_settings_async("basic_safety_settings", "data_export_switch")
             )
+            self.data_export_switch.blockSignals(True)
+            self.data_export_switch.setChecked(prev)
+            self.data_export_switch.blockSignals(False)
 
-        require_and_run("toggle_data_export_switch", self, apply)
+            def apply():
+                update_settings(
+                    "basic_safety_settings",
+                    "data_export_switch",
+                    desired,
+                )
+
+            require_and_run("toggle_data_export_switch", self, apply)
+        finally:
+            self._busy = False
 
     def __on_ops_import_overwrite_changed(self):
-        if not password_is_configured():
-            try:
-                self.import_overwrite_switch.blockSignals(True)
-                self.import_overwrite_switch.setChecked(False)
-                self.import_overwrite_switch.blockSignals(False)
-                update_settings(
-                    "basic_safety_settings", "import_overwrite_switch", False
-                )
-            except Exception:
-                pass
+        if self._busy:
             return
-        desired = bool(self.import_overwrite_switch.isChecked())
-        prev = bool(
-            readme_settings_async("basic_safety_settings", "import_overwrite_switch")
-        )
-        self.import_overwrite_switch.blockSignals(True)
-        self.import_overwrite_switch.setChecked(prev)
-        self.import_overwrite_switch.blockSignals(False)
-
-        def apply():
-            update_settings(
-                "basic_safety_settings",
-                "import_overwrite_switch",
-                desired,
+        self._busy = True
+        try:
+            if not password_is_configured():
+                try:
+                    self.import_overwrite_switch.blockSignals(True)
+                    self.import_overwrite_switch.setChecked(False)
+                    self.import_overwrite_switch.blockSignals(False)
+                    update_settings(
+                        "basic_safety_settings", "import_overwrite_switch", False
+                    )
+                except Exception:
+                    pass
+                return
+            desired = bool(self.import_overwrite_switch.isChecked())
+            prev = bool(
+                readme_settings_async(
+                    "basic_safety_settings", "import_overwrite_switch"
+                )
             )
+            self.import_overwrite_switch.blockSignals(True)
+            self.import_overwrite_switch.setChecked(prev)
+            self.import_overwrite_switch.blockSignals(False)
 
-        require_and_run("toggle_import_overwrite_switch", self, apply)
+            def apply():
+                update_settings(
+                    "basic_safety_settings",
+                    "import_overwrite_switch",
+                    desired,
+                )
+
+            require_and_run("toggle_import_overwrite_switch", self, apply)
+        finally:
+            self._busy = False
 
     def __on_ops_import_version_mismatch_changed(self):
-        if not password_is_configured():
-            try:
-                self.import_version_mismatch_switch.blockSignals(True)
-                self.import_version_mismatch_switch.setChecked(False)
-                self.import_version_mismatch_switch.blockSignals(False)
-                update_settings(
-                    "basic_safety_settings", "import_version_mismatch_switch", False
-                )
-            except Exception:
-                pass
+        if self._busy:
             return
-        desired = bool(self.import_version_mismatch_switch.isChecked())
-        prev = bool(
-            readme_settings_async(
-                "basic_safety_settings", "import_version_mismatch_switch"
+        self._busy = True
+        try:
+            if not password_is_configured():
+                try:
+                    self.import_version_mismatch_switch.blockSignals(True)
+                    self.import_version_mismatch_switch.setChecked(False)
+                    self.import_version_mismatch_switch.blockSignals(False)
+                    update_settings(
+                        "basic_safety_settings", "import_version_mismatch_switch", False
+                    )
+                except Exception:
+                    pass
+                return
+            desired = bool(self.import_version_mismatch_switch.isChecked())
+            prev = bool(
+                readme_settings_async(
+                    "basic_safety_settings", "import_version_mismatch_switch"
+                )
             )
-        )
-        self.import_version_mismatch_switch.blockSignals(True)
-        self.import_version_mismatch_switch.setChecked(prev)
-        self.import_version_mismatch_switch.blockSignals(False)
+            self.import_version_mismatch_switch.blockSignals(True)
+            self.import_version_mismatch_switch.setChecked(prev)
+            self.import_version_mismatch_switch.blockSignals(False)
 
-        def apply():
-            update_settings(
-                "basic_safety_settings",
-                "import_version_mismatch_switch",
-                desired,
-            )
+            def apply():
+                update_settings(
+                    "basic_safety_settings",
+                    "import_version_mismatch_switch",
+                    desired,
+                )
 
-        require_and_run("toggle_import_version_mismatch_switch", self, apply)
+            require_and_run("toggle_import_version_mismatch_switch", self, apply)
+        finally:
+            self._busy = False
 
     def __on_ops_preview_settings_changed(self):
-        if not password_is_configured():
+        if self._busy:
+            return
+        self._busy = True
+        try:
+            if not password_is_configured():
+                try:
+                    self.preview_settings_switch.blockSignals(True)
+                    self.preview_settings_switch.setChecked(False)
+                    self.preview_settings_switch.blockSignals(False)
+                    update_settings(
+                        "basic_safety_settings", "preview_settings_switch", False
+                    )
+                except Exception:
+                    pass
+                return
+
+            # 保存当前状态以备回滚
+            prev_state = bool(
+                readme_settings_async(
+                    "basic_safety_settings", "preview_settings_switch"
+                )
+            )
+            desired = bool(self.preview_settings_switch.isChecked())
+
+            # 立即更新UI，如果验证失败将回滚
             try:
                 self.preview_settings_switch.blockSignals(True)
-                self.preview_settings_switch.setChecked(False)
+                self.preview_settings_switch.setChecked(desired)
                 self.preview_settings_switch.blockSignals(False)
-                update_settings(
-                    "basic_safety_settings", "preview_settings_switch", False
-                )
             except Exception:
                 pass
-            return
 
-        # 保存当前状态以备回滚
-        prev_state = bool(
-            readme_settings_async("basic_safety_settings", "preview_settings_switch")
-        )
-        desired = bool(self.preview_settings_switch.isChecked())
+            def apply():
+                update_settings(
+                    "basic_safety_settings",
+                    "preview_settings_switch",
+                    desired,
+                )
 
-        # 立即更新UI，如果验证失败将回滚
-        try:
-            self.preview_settings_switch.blockSignals(True)
-            self.preview_settings_switch.setChecked(desired)
-            self.preview_settings_switch.blockSignals(False)
-        except Exception:
-            pass
+            require_and_run("toggle_preview_settings_switch", self, apply)
+        finally:
+            self._busy = False
 
-        def apply():
-            update_settings(
-                "basic_safety_settings",
-                "preview_settings_switch",
-                desired,
-            )
-
-        require_and_run("toggle_preview_settings_switch", self, apply)
+    def _update_enabled_state(self, global_safety_enabled):
+        """根据全局安全总开关状态更新组件的启用状态"""
+        # 如果全局安全总开关关闭，禁用除总开关外的所有安全相关组件
+        if not global_safety_enabled:
+            self.show_hide_floating_window_switch.setEnabled(False)
+            self.restart_switch.setEnabled(False)
+            self.exit_switch.setEnabled(False)
+            self.open_settings_switch.setEnabled(False)
+            self.diagnostic_export_switch.setEnabled(False)
+            self.data_export_switch.setEnabled(False)
+            self.import_overwrite_switch.setEnabled(False)
+            self.import_version_mismatch_switch.setEnabled(False)
+            self.preview_settings_switch.setEnabled(False)
+        else:
+            # 全局安全总开关开启时，根据密码配置状态决定其他组件是否启用
+            password_configured = password_is_configured()
+            self.show_hide_floating_window_switch.setEnabled(password_configured)
+            self.restart_switch.setEnabled(password_configured)
+            self.exit_switch.setEnabled(password_configured)
+            self.open_settings_switch.setEnabled(password_configured)
+            self.diagnostic_export_switch.setEnabled(password_configured)
+            self.data_export_switch.setEnabled(password_configured)
+            self.import_overwrite_switch.setEnabled(password_configured)
+            self.import_version_mismatch_switch.setEnabled(password_configured)
+            self.preview_settings_switch.setEnabled(password_configured)

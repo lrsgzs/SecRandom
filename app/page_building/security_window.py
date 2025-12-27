@@ -120,10 +120,13 @@ def create_unbind_usb_window():
 
 class verify_password_window_template(PageTemplate):
     def __init__(self, parent=None, operation_type=None):
+        def factory(parent):
+            return VerifyPasswordWindow(parent=parent, operation_type=operation_type)
+
+        factory.__name__ = "VerifyPasswordWindow"
         super().__init__(
-            content_widget_class=VerifyPasswordWindow,
+            content_widget_class=factory,
             parent=parent,
-            operation_type=operation_type,
         )
 
 
