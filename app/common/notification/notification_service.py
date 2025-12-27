@@ -9,6 +9,7 @@ from app.page_building.page_template import PageTemplate
 from app.tools.variable import WINDOW_BOTTOM_POSITION_FACTOR
 from app.Language.obtain_language import get_any_position_value
 from app.tools.settings_access import readme_settings_async
+from app.common.IPC_URL.url_ipc_handler import URLIPCHandler
 
 
 class NotificationContentWidget(QWidget):
@@ -189,6 +190,7 @@ class FloatingNotificationWindow(CardWidget):
         # 创建顶部拖动提示线
         self.drag_line = QWidget()
         self.drag_line.setFixedHeight(5)
+        self.drag_line.setFixedWidth(80)
         self.update_drag_line_style()
         drag_line_layout.addWidget(self.drag_line)
 
@@ -821,7 +823,156 @@ class FloatingNotificationManager:
     def __init__(self):
         if not self._initialized:
             self.notification_windows = {}
+            # 初始化IPC处理器
+            self.ipc_handler = URLIPCHandler("SecRandom", "secrandom")
             self._initialized = True
+
+    def send_to_classisland(
+        self,
+        class_name,
+        selected_students,
+        draw_count=1,
+        settings=None,
+        settings_group=None,
+    ):
+        """发送通知到ClassIsland
+
+        Args:
+            class_name: 班级名称
+            selected_students: 选中的学生列表 [(学号, 姓名, 是否存在), ...]
+            draw_count: 抽取的学生数量
+            settings: 通知设置参数
+            settings_group: 设置组名称
+        """
+        try:
+            # 构建通知数据
+            notification_data = {
+                "type": "notification",
+                "subtype": "roll_call",
+                "class_name": class_name,
+                "selected_students": [
+                    {
+                        "student_id": student[0],
+                        "student_name": student[1],
+                        "exists": student[2],
+                    }
+                    for student in selected_students
+                ],
+                "draw_count": draw_count,
+            }
+
+            # 如果提供了设置，添加显示时长
+            if settings:
+                display_duration = settings.get("notification_display_duration", 5)
+                notification_data["display_duration"] = display_duration
+
+            # 创建ClassIsland IPC处理器来发送消息
+            classisland_ipc = URLIPCHandler("ClassIsland", "classisland")
+
+            # 尝试从配置中加载ClassIsland的端口
+            port = classisland_ipc.load_port_config()
+
+            if port is None:
+                logger.warning("无法获取ClassIsland的IPC端口，可能ClassIsland未运行")
+                # 如果无法获取端口，回退到SecRandom通知服务
+                logger.info("回退到SecRandom通知服务")
+                self._show_secrandom_notification(
+                    class_name, selected_students, draw_count, settings, settings_group
+                )
+                return
+
+            # 发送IPC消息到ClassIsland
+            response = classisland_ipc.send_ipc_message(port, notification_data)
+
+            if response:
+                logger.info("成功发送通知到ClassIsland: {}", response)
+            else:
+                logger.warning("发送通知到ClassIsland失败")
+                # 如果发送失败，回退到SecRandom通知服务
+                logger.info("回退到SecRandom通知服务")
+                self._show_secrandom_notification(
+                    class_name, selected_students, draw_count, settings, settings_group
+                )
+
+        except Exception as e:
+            logger.exception("发送通知到ClassIsland时出错: {}", e)
+            # 如果发生异常，回退到SecRandom通知服务
+            logger.info("因错误回退到SecRandom通知服务")
+            self._show_secrandom_notification(
+                class_name, selected_students, draw_count, settings, settings_group
+            )
+
+    def _show_secrandom_notification(
+        self,
+        class_name,
+        selected_students,
+        draw_count=1,
+        settings=None,
+        settings_group=None,
+    ):
+        """显示SecRandom内置通知（用于回退）"""
+        # 重新调用SecRandom通知服务，使用原始的show_roll_call_result逻辑
+        if settings:
+            font_size = settings.get("font_size", 50)
+            animation_color = settings.get("animation_color_theme", 0)
+            display_format = settings.get("display_format", 0)
+            show_student_image = settings.get("student_image", False)
+            is_animation_enabled = settings.get("animation", True)
+        else:
+            # 当没有传递设置时，使用默认值
+            font_size = 50
+            animation_color = 0
+            display_format = 0
+            show_student_image = False
+            is_animation_enabled = True
+
+        # 使用ResultDisplayUtils创建学生标签（动态导入避免循环依赖）
+        from app.common.display.result_display import ResultDisplayUtils
+
+        # 确定使用的设置组
+        # 如果 settings_group 是通知设置组，则使用对应的功能设置组的字体设置
+        if settings_group is None:
+            settings_group = "notification_settings"
+        # 根据通知设置组名称确定对应的功能设置组
+        if settings_group == "roll_call_notification_settings":
+            font_settings_group = "roll_call_settings"
+        elif settings_group == "quick_draw_notification_settings":
+            font_settings_group = "quick_draw_settings"
+        elif settings_group == "lottery_notification_settings":
+            font_settings_group = "lottery_settings"
+        else:
+            font_settings_group = settings_group
+
+        student_labels = ResultDisplayUtils.create_student_label(
+            class_name=class_name,
+            selected_students=selected_students,
+            draw_count=draw_count,
+            font_size=font_size,
+            animation_color=animation_color,
+            display_format=display_format,
+            show_student_image=show_student_image,
+            settings_group=settings_group,
+            custom_font_family=font_settings_group,
+        )
+
+        # 创建或获取通知窗口
+        if "floating" not in self.notification_windows:
+            self.notification_windows["floating"] = FloatingNotificationWindow()
+
+        window = self.notification_windows["floating"]
+        window.is_animation_enabled = is_animation_enabled
+        # 如果窗口已经存在并且有活动的自动关闭定时器，停止它以防止窗口被隐藏
+        if window.auto_close_timer.isActive():
+            window.auto_close_timer.stop()
+
+        # 应用显示时长设置到窗口
+        if settings:
+            display_duration = settings.get("notification_display_duration", 5)
+            window.apply_settings({**settings, "auto_close_time": display_duration})
+        else:
+            window.apply_settings({"auto_close_time": 5})  # 默认5秒
+
+        window.update_content(student_labels, settings, font_settings_group)
 
     def get_notification_title(self):
         """获取通知标题文本（支持多语言）"""
@@ -853,6 +1004,25 @@ class FloatingNotificationManager:
             settings: 通知设置参数
             settings_group: 设置组名称，默认为notification_settings
         """
+        # 获取通知服务类型设置
+        notification_service_type = 0  # 默认为SecRandom通知服务
+        if settings_group:
+            # 根据设置组获取对应的通知服务类型设置
+            try:
+                notification_service_type = readme_settings_async(
+                    settings_group, "notification_service_type"
+                )
+            except Exception as e:
+                logger.warning("获取通知服务类型设置失败，使用默认值: {}", e)
+
+        # 如果选择了ClassIsland通知服务，则发送到ClassIsland
+        if notification_service_type == 1:  # 1 表示 ClassIsland 通知服务
+            self.send_to_classisland(
+                class_name, selected_students, draw_count, settings, settings_group
+            )
+            return
+
+        # 否则使用SecRandom浮窗通知
         # 获取设置
         if settings:
             font_size = settings.get("font_size", 50)
@@ -906,6 +1076,14 @@ class FloatingNotificationManager:
         # 如果窗口已经存在并且有活动的自动关闭定时器，停止它以防止窗口被隐藏
         if window.auto_close_timer.isActive():
             window.auto_close_timer.stop()
+
+        # 应用显示时长设置到窗口
+        if settings:
+            display_duration = settings.get("notification_display_duration", 5)
+            window.apply_settings({**settings, "auto_close_time": display_duration})
+        else:
+            window.apply_settings({"auto_close_time": 5})  # 默认5秒
+
         window.update_content(student_labels, settings, font_settings_group)
 
     def close_all_notifications(self):

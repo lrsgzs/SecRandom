@@ -138,6 +138,45 @@ class basic_settings(GroupHeaderCardWidget):
             )
         )
 
+        # 通知服务类型选择
+        self.notification_service_type_combo_box = ComboBox()
+        self.notification_service_type_combo_box.addItems(
+            get_content_combo_name_async(
+                "lottery_notification_settings", "notification_service_type"
+            )
+        )
+        self.notification_service_type_combo_box.setCurrentIndex(
+            readme_settings_async(
+                "lottery_notification_settings", "notification_service_type"
+            )
+        )
+        self.notification_service_type_combo_box.currentTextChanged.connect(
+            lambda: update_settings(
+                "lottery_notification_settings",
+                "notification_service_type",
+                self.notification_service_type_combo_box.currentIndex(),
+            )
+        )
+
+        # 通知显示时长
+        self.notification_display_duration_spinbox = SpinBox()
+        self.notification_display_duration_spinbox.setFixedWidth(WIDTH_SPINBOX)
+        self.notification_display_duration_spinbox.setMinimum(1)
+        self.notification_display_duration_spinbox.setMaximum(60)
+        self.notification_display_duration_spinbox.setSuffix("s")
+        self.notification_display_duration_spinbox.setValue(
+            readme_settings_async(
+                "lottery_notification_settings", "notification_display_duration"
+            )
+        )
+        self.notification_display_duration_spinbox.valueChanged.connect(
+            lambda: update_settings(
+                "lottery_notification_settings",
+                "notification_display_duration",
+                self.notification_display_duration_spinbox.value(),
+            )
+        )
+
         # 添加设置项到分组
         self.addGroup(
             get_theme_icon("ic_fluent_comment_20_filled"),
@@ -174,6 +213,26 @@ class basic_settings(GroupHeaderCardWidget):
                 "lottery_notification_settings", "main_window_display_threshold"
             ),
             self.main_window_threshold_spinbox,
+        )
+        self.addGroup(
+            get_theme_icon("ic_fluent_alert_20_filled"),
+            get_content_name_async(
+                "lottery_notification_settings", "notification_service_type"
+            ),
+            get_content_description_async(
+                "lottery_notification_settings", "notification_service_type"
+            ),
+            self.notification_service_type_combo_box,
+        )
+        self.addGroup(
+            get_theme_icon("ic_fluent_timer_20_filled"),
+            get_content_name_async(
+                "lottery_notification_settings", "notification_display_duration"
+            ),
+            get_content_description_async(
+                "lottery_notification_settings", "notification_display_duration"
+            ),
+            self.notification_display_duration_spinbox,
         )
 
 
@@ -266,7 +325,7 @@ class floating_window_settings(GroupHeaderCardWidget):
         self.floating_window_auto_close_time_spinbox = SpinBox()
         self.floating_window_auto_close_time_spinbox.setFixedWidth(WIDTH_SPINBOX)
         self.floating_window_auto_close_time_spinbox.setMinimum(1)
-        self.floating_window_auto_close_time_spinbox.setSuffix("秒")
+        self.floating_window_auto_close_time_spinbox.setSuffix("s")
         self.floating_window_auto_close_time_spinbox.setValue(
             readme_settings_async(
                 "lottery_notification_settings", "floating_window_auto_close_time"

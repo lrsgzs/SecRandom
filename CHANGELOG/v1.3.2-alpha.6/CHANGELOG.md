@@ -19,6 +19,9 @@ v2.0 - Koharu（小鸟游星野） Alpha 6
 - 新增 **C# IPC通信示例**，提供ClassIsland软件通过TCP Socket向SecRandom发送JSON数据的实现方法
 - 新增 **ClassIsland数据源切换功能**，在**时间设置**中添加开关以选择使用CSES或ClassIsland数据判断课间时间
 - 新增 **ClassIsland状态处理机制**，实现对ClassIsland传入数据的解析和课间状态的动态更新
+- 新增 **通知服务选择功能**，在**点名**、**闪抽**和**抽奖**通知设置中增加下拉框选择**SecRandom**或**ClassIsland**通知服务
+- 新增 **通知显示时长设置**，在**点名**、**闪抽**和**抽奖**通知设置中增加微调框设置通知显示时长（1-60秒）
+- 新增 **ClassIsland IPC通信**，实现与**ClassIsland**应用程序的**IPC**通信功能，能够发送通知数据
 
 ## 💡 功能优化
 
@@ -44,6 +47,9 @@ v2.0 - Koharu（小鸟游星野） Alpha 6
 - 优化 **课间禁用逻辑**，新增根据ClassIsland软件传入的课程表信息实时判断当前是否为课间时间的功能
 - 优化 **CSES解析功能**，修改**非上课时间判断逻辑**，使用CSES解析器从CSES文件动态生成非上课时间段配置，替代原有的静态配置方式
 - 优化 **时间设置模块**，新增从**data/CSES目录**读取YAML格式课程表文件功能，提升时间配置的灵活性和准确性
+- 优化 **通知浮窗拖动条美观**，将拖动条宽度固定为80px，高度固定为5px，提升美观度
+- 优化 **通知处理机制**，修改**FloatingNotificationManager**类根据用户设置动态选择**通知服务类型**
+- 优化 **代码复用性**，通过**ResultDisplayUtils.show_notification_if_enabled**方法使所有通知功能支持新的**通知服务选择功能**
 
 ## 🐛 修复问题
 
@@ -71,6 +77,8 @@ v2.0 - Koharu（小鸟游星野） Alpha 6
 - 修复 **AttributeError错误**，在safety_settings.py中添加_missing属性初始化，解决'_busy'属性不存在问题
 - 修复 **IPC服务器重启问题**，修改MainWindow初始化方法传递url_handler实例，解决无法访问URLHandler实例错误
 - 修复 **Python语法错误**，移除main.py中不必要global声明，解决变量使用前声明的语法问题
+- 修复 **通知服务单一问题**，解决之前只能使用**SecRandom内置通知**的限制，新增**ClassIsland通知服务**，用户可根据需要选择不同的通知服务
+- 修复 **连接失败处理**，实现**智能回退机制**，当**ClassIsland**不可用时自动回退到**SecRandom通知**确保功能可用性
 
 ## 🔧 其它变更
 

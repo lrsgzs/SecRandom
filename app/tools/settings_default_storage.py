@@ -213,6 +213,8 @@ DEFAULT_SETTINGS = {
         "floating_window_auto_close_time": {"default_value": 5},
         "use_main_window_when_exceed_threshold": {"default_value": True},
         "main_window_display_threshold": {"default_value": 5},
+        "notification_service_type": {"default_value": 0},
+        "notification_display_duration": {"default_value": 5},
     },
     "quick_draw_notification_settings": {
         "title": {"default_value": None},
@@ -234,6 +236,8 @@ DEFAULT_SETTINGS = {
         "floating_window_vertical_offset": {"default_value": 0},
         "floating_window_transparency": {"default_value": 0.6},
         "floating_window_auto_close_time": {"default_value": 5},
+        "notification_service_type": {"default_value": 0},
+        "notification_display_duration": {"default_value": 5},
     },
     "lottery_notification_settings": {
         "title": {"default_value": None},
@@ -257,6 +261,8 @@ DEFAULT_SETTINGS = {
         "floating_window_auto_close_time": {"default_value": 5},
         "use_main_window_when_exceed_threshold": {"default_value": True},
         "main_window_display_threshold": {"default_value": 5},
+        "notification_service_type": {"default_value": 0},
+        "notification_display_duration": {"default_value": 5},
     },
     "safety_settings": {"title": {"default_value": None}},
     "basic_safety_settings": {

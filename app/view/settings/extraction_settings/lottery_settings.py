@@ -67,7 +67,6 @@ class lottery_extraction_function(GroupHeaderCardWidget):
         self.half_repeat_spin = SpinBox()
         self.half_repeat_spin.setFixedWidth(WIDTH_SPINBOX)
         self.half_repeat_spin.setMinimum(0)
-        self.half_repeat_spin.setSuffix("次")
         self.half_repeat_spin.setValue(
             readme_settings_async("lottery_settings", "half_repeat")
         )
@@ -488,7 +487,6 @@ class lottery_basic_animation_settings(GroupHeaderCardWidget):
         self.autoplay_count_spin = SpinBox()
         self.autoplay_count_spin.setFixedWidth(WIDTH_SPINBOX)
         self.autoplay_count_spin.setMinimum(1)
-        self.autoplay_count_spin.setSuffix("次")
         self.autoplay_count_spin.setValue(
             readme_settings_async("lottery_settings", "autoplay_count")
         )

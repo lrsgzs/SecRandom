@@ -96,6 +96,15 @@ roll_call_notification_settings = {
             "name": "浮窗通知阈值",
             "description": "设置触发浮窗通知的人数阈值，超过此数值则不显示浮窗通知，最小值为1",
         },
+        "notification_service_type": {
+            "name": "通知服务类型",
+            "description": "选择通知服务类型，SecRandom或ClassIsland",
+            "combo_items": ["SecRandom通知服务", "ClassIsland通知服务"],
+        },
+        "notification_display_duration": {
+            "name": "通知显示时长",
+            "description": "设置通知显示时长（秒）",
+        },
     },
     "EN_US": {
         "title": {
@@ -165,6 +174,18 @@ roll_call_notification_settings = {
             "name": "主窗口显示阈值",
             "description": "设置触发主窗口显示结果的人数阈值，最小值为1",
         },
+        "notification_service_type": {
+            "name": "Notification service type",
+            "description": "Select notification service type, SecRandom or ClassIsland",
+            "combo_items": [
+                "SecRandom Notification Service",
+                "ClassIsland Notification Service",
+            ],
+        },
+        "notification_display_duration": {
+            "name": "Notification display duration",
+            "description": "Set notification display duration (seconds)",
+        },
     },
 }
 
@@ -227,6 +248,15 @@ quick_draw_notification_settings = {
             "name": "浮窗自动关闭时间",
             "description": "设置浮窗自动关闭时间（秒），设为0表示不自动关闭",
         },
+        "notification_service_type": {
+            "name": "通知服务类型",
+            "description": "选择通知服务类型，SecRandom或ClassIsland",
+            "combo_items": ["SecRandom通知服务", "ClassIsland通知服务"],
+        },
+        "notification_display_duration": {
+            "name": "通知显示时长",
+            "description": "设置通知显示时长（秒）",
+        },
     },
     "EN_US": {
         "title": {
@@ -283,6 +313,18 @@ quick_draw_notification_settings = {
         "floating_window_auto_close_time": {
             "name": "Floating window auto-close time",
             "description": "Set the time to close the floating window automatically (seconds), set to 0 to not close automatically",
+        },
+        "notification_service_type": {
+            "name": "Notification service type",
+            "description": "Select notification service type, SecRandom or ClassIsland",
+            "combo_items": [
+                "SecRandom Notification Service",
+                "ClassIsland Notification Service",
+            ],
+        },
+        "notification_display_duration": {
+            "name": "Notification display duration",
+            "description": "Set notification display duration (seconds)",
         },
     },
 }
@@ -360,6 +402,15 @@ lottery_notification_settings = {
             "name": "浮窗通知阈值",
             "description": "设置触发浮窗通知的奖数阈值，超过此数值则不显示浮窗通知，最小值为1",
         },
+        "notification_service_type": {
+            "name": "通知服务类型",
+            "description": "选择通知服务类型，SecRandom或ClassIsland",
+            "combo_items": ["SecRandom通知服务", "ClassIsland通知服务"],
+        },
+        "notification_display_duration": {
+            "name": "通知显示时长",
+            "description": "设置通知显示时长（秒）",
+        },
     },
     "EN_US": {
         "title": {
@@ -428,6 +479,18 @@ lottery_notification_settings = {
         "main_window_display_threshold": {
             "name": "主窗口显示阈值",
             "description": "设置触发主窗口显示结果的奖数阈值，最小值为1",
+        },
+        "notification_service_type": {
+            "name": "Notification service type",
+            "description": "Select notification service type, SecRandom or ClassIsland",
+            "combo_items": [
+                "SecRandom Notification Service",
+                "ClassIsland Notification Service",
+            ],
+        },
+        "notification_display_duration": {
+            "name": "Notification display duration",
+            "description": "Set notification display duration (seconds)",
         },
     },
 }
