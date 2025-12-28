@@ -466,7 +466,7 @@ DEFAULT_SETTINGS = {
         "shield_enabled": {"default_value": False},
         "shield_time": {"default_value": 5.00},
         "shield_time_unit": {"default_value": 0},
-        "enable_avg_gap_protection": {"default_value": True},
+        "enable_avg_gap_protection": {"default_value": False},
         "gap_threshold": {"default_value": 1},
         "min_pool_size": {"default_value": 5},
     },
