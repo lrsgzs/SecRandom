@@ -35,6 +35,12 @@ class quick_draw_notification_settings(QWidget):
         self.floating_window_widget = floating_window_settings(self)
         self.vBoxLayout.addWidget(self.floating_window_widget)
 
+        # 添加通知显示时长设置组件
+        self.classisland_notification_service_widget = (
+            classisland_notification_service_settings(self)
+        )
+        self.vBoxLayout.addWidget(self.classisland_notification_service_widget)
+
 
 class basic_settings(GroupHeaderCardWidget):
     def __init__(self, parent=None):
@@ -87,25 +93,6 @@ class basic_settings(GroupHeaderCardWidget):
             )
         )
 
-        # 通知显示时长
-        self.notification_display_duration_spinbox = SpinBox()
-        self.notification_display_duration_spinbox.setFixedWidth(WIDTH_SPINBOX)
-        self.notification_display_duration_spinbox.setMinimum(1)
-        self.notification_display_duration_spinbox.setMaximum(60)
-        self.notification_display_duration_spinbox.setSuffix("s")
-        self.notification_display_duration_spinbox.setValue(
-            readme_settings_async(
-                "quick_draw_notification_settings", "notification_display_duration"
-            )
-        )
-        self.notification_display_duration_spinbox.valueChanged.connect(
-            lambda: update_settings(
-                "quick_draw_notification_settings",
-                "notification_display_duration",
-                self.notification_display_duration_spinbox.value(),
-            )
-        )
-
         # 添加设置项到分组
         self.addGroup(
             get_theme_icon("ic_fluent_sanitize_20_filled"),
@@ -124,16 +111,6 @@ class basic_settings(GroupHeaderCardWidget):
                 "quick_draw_notification_settings", "notification_service_type"
             ),
             self.notification_service_type_combo_box,
-        )
-        self.addGroup(
-            get_theme_icon("ic_fluent_timer_20_filled"),
-            get_content_name_async(
-                "quick_draw_notification_settings", "notification_display_duration"
-            ),
-            get_content_description_async(
-                "quick_draw_notification_settings", "notification_display_duration"
-            ),
-            self.notification_display_duration_spinbox,
         )
 
 
@@ -359,3 +336,46 @@ class floating_window_settings(GroupHeaderCardWidget):
                 "floating_window_enabled_monitor",
                 self.enabled_monitor_combo_box.currentText(),
             )
+
+
+class classisland_notification_service_settings(GroupHeaderCardWidget):
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setTitle(
+            get_content_name_async(
+                "quick_draw_notification_settings",
+                "classisland_notification_service_settings",
+            )
+        )
+        self.setBorderRadius(8)
+
+        # 通知显示时长
+        self.notification_display_duration_spinbox = SpinBox()
+        self.notification_display_duration_spinbox.setFixedWidth(WIDTH_SPINBOX)
+        self.notification_display_duration_spinbox.setMinimum(1)
+        self.notification_display_duration_spinbox.setMaximum(60)
+        self.notification_display_duration_spinbox.setSuffix("s")
+        self.notification_display_duration_spinbox.setValue(
+            readme_settings_async(
+                "quick_draw_notification_settings", "notification_display_duration"
+            )
+        )
+        self.notification_display_duration_spinbox.valueChanged.connect(
+            lambda: update_settings(
+                "quick_draw_notification_settings",
+                "notification_display_duration",
+                self.notification_display_duration_spinbox.value(),
+            )
+        )
+
+        # 添加设置项到分组
+        self.addGroup(
+            get_theme_icon("ic_fluent_timer_20_filled"),
+            get_content_name_async(
+                "quick_draw_notification_settings", "notification_display_duration"
+            ),
+            get_content_description_async(
+                "quick_draw_notification_settings", "notification_display_duration"
+            ),
+            self.notification_display_duration_spinbox,
+        )

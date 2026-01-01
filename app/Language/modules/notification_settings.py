@@ -34,13 +34,13 @@ roll_call_notification_settings = {
     "ZH_CN": {
         "title": {"name": "点名通知设置", "description": "点名通知功能设置"},
         "basic_settings": {"name": "基础设置", "description": "配置通知显示基础参数"},
-        "window_mode": {
-            "name": "窗口模式",
-            "description": "配置点名通知窗口显示方式",
-        },
         "floating_window_mode": {
             "name": "浮窗模式",
             "description": "配置点名通知浮窗行为",
+        },
+        "classisland_notification_service_settings": {
+            "name": "ClassIsland通知服务",
+            "description": "配置ClassIsland通知服务参数",
         },
         "call_notification_service": {
             "name": "调用通知服务",
@@ -98,12 +98,12 @@ roll_call_notification_settings = {
         },
         "notification_service_type": {
             "name": "通知服务类型",
-            "description": "选择通知服务类型，SecRandom或ClassIsland",
-            "combo_items": ["SecRandom通知服务", "ClassIsland通知服务"],
+            "description": "选择通知服务类型，内置服务或ClassIsland",
+            "combo_items": ["内置通知服务", "ClassIsland通知服务"],
         },
         "notification_display_duration": {
             "name": "通知显示时长",
-            "description": "设置通知显示时长（秒）",
+            "description": "设置ClassIsland通知显示时长（秒）",
         },
     },
     "EN_US": {
@@ -200,13 +200,13 @@ quick_draw_notification_settings = {
             "name": "基础设置",
             "description": "配置闪抽通知基础显示参数",
         },
-        "window_mode": {
-            "name": "窗口模式",
-            "description": "设置闪抽通知窗口显示方式",
-        },
         "floating_window_mode": {
             "name": "浮窗模式",
             "description": "设置闪抽通知浮窗行为模式",
+        },
+        "classisland_notification_service_settings": {
+            "name": "ClassIsland通知服务",
+            "description": "配置ClassIsland通知服务参数",
         },
         "animation": {
             "name": "动画",
@@ -250,12 +250,12 @@ quick_draw_notification_settings = {
         },
         "notification_service_type": {
             "name": "通知服务类型",
-            "description": "选择通知服务类型，SecRandom或ClassIsland",
-            "combo_items": ["SecRandom通知服务", "ClassIsland通知服务"],
+            "description": "选择通知服务类型，内置服务或ClassIsland",
+            "combo_items": ["内置通知服务", "ClassIsland通知服务"],
         },
         "notification_display_duration": {
             "name": "通知显示时长",
-            "description": "设置通知显示时长（秒）",
+            "description": "设置ClassIsland通知显示时长（秒）",
         },
     },
     "EN_US": {
@@ -340,13 +340,13 @@ lottery_notification_settings = {
             "name": "基础设置",
             "description": "配置抽奖通知基础显示参数",
         },
-        "window_mode": {
-            "name": "窗口模式",
-            "description": "设置抽奖通知窗口显示方式",
-        },
         "floating_window_mode": {
             "name": "浮窗模式",
             "description": "设置抽奖通知浮窗行为模式",
+        },
+        "classisland_notification_service_settings": {
+            "name": "ClassIsland通知服务",
+            "description": "配置ClassIsland通知服务参数",
         },
         "call_notification_service": {
             "name": "调用通知服务",
@@ -404,12 +404,12 @@ lottery_notification_settings = {
         },
         "notification_service_type": {
             "name": "通知服务类型",
-            "description": "选择通知服务类型，SecRandom或ClassIsland",
-            "combo_items": ["SecRandom通知服务", "ClassIsland通知服务"],
+            "description": "选择通知服务类型，内置服务或ClassIsland",
+            "combo_items": ["内置通知服务", "ClassIsland通知服务"],
         },
         "notification_display_duration": {
             "name": "通知显示时长",
-            "description": "设置通知显示时长（秒）",
+            "description": "设置ClassIsland通知显示时长（秒）",
         },
     },
     "EN_US": {
