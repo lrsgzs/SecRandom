@@ -20,6 +20,7 @@ from qfluentwidgets import (
 
 from app.tools.personalised import get_theme_icon
 from app.tools.settings_access import readme_settings_async, update_settings
+from app.tools.settings_visibility_manager import is_setting_visible
 from app.Language.obtain_language import (
     get_all_languages_name,
     get_any_position_value_async,
@@ -74,6 +75,25 @@ class basic_settings_function(GroupHeaderCardWidget):
         super().__init__(parent)
         self.setTitle(get_content_name_async("basic_settings", "basic_function"))
         self.setBorderRadius(8)
+
+        # 精简设置模式开关
+        self.simplified_mode_switch = SwitchButton()
+        self.simplified_mode_switch.setOffText(
+            get_content_switchbutton_name_async(
+                "basic_settings", "simplified_mode", "disable"
+            )
+        )
+        self.simplified_mode_switch.setOnText(
+            get_content_switchbutton_name_async(
+                "basic_settings", "simplified_mode", "enable"
+            )
+        )
+        self.simplified_mode_switch.setChecked(
+            readme_settings_async("basic_settings", "simplified_mode")
+        )
+        self.simplified_mode_switch.checkedChanged.connect(
+            self.__on_simplified_mode_changed
+        )
 
         # 开机自启设置
         self.autostart_switch = SwitchButton()
@@ -180,6 +200,12 @@ class basic_settings_function(GroupHeaderCardWidget):
 
         # 添加设置项到分组
         self.addGroup(
+            get_theme_icon("ic_fluent_filter_20_filled"),
+            get_content_name_async("basic_settings", "simplified_mode"),
+            get_content_description_async("basic_settings", "simplified_mode"),
+            self.simplified_mode_switch,
+        )
+        self.addGroup(
             get_theme_icon("ic_fluent_arrow_sync_20_filled"),
             get_content_name_async("basic_settings", "autostart"),
             get_content_description_async("basic_settings", "autostart"),
@@ -191,30 +217,61 @@ class basic_settings_function(GroupHeaderCardWidget):
             get_content_description_async("basic_settings", "show_startup_window"),
             self.show_startup_window_switch,
         )
-        self.addGroup(
-            get_theme_icon("ic_fluent_save_20_filled"),
-            get_content_name_async("basic_settings", "auto_save_window_size"),
-            get_content_description_async("basic_settings", "auto_save_window_size"),
-            self.auto_save_window_size_switch,
-        )
-        self.addGroup(
-            get_theme_icon("ic_fluent_resize_20_filled"),
-            get_content_name_async("basic_settings", "background_resident"),
-            get_content_description_async("basic_settings", "background_resident"),
-            self.resident_switch,
-        )
-        self.addGroup(
-            get_theme_icon("ic_fluent_link_20_filled"),
-            get_content_name_async("basic_settings", "url_protocol"),
-            get_content_description_async("basic_settings", "url_protocol"),
-            self.url_protocol_switch,
-        )
-        self.addGroup(
-            get_theme_icon("ic_fluent_server_20_filled"),
-            get_content_name_async("basic_settings", "ipc_port"),
-            get_content_description_async("basic_settings", "ipc_port"),
-            self.ipc_port_spinbox,
-        )
+        if is_setting_visible("basic_settings", "auto_save_window_size"):
+            self.addGroup(
+                get_theme_icon("ic_fluent_save_20_filled"),
+                get_content_name_async("basic_settings", "auto_save_window_size"),
+                get_content_description_async(
+                    "basic_settings", "auto_save_window_size"
+                ),
+                self.auto_save_window_size_switch,
+            )
+        if is_setting_visible("basic_settings", "background_resident"):
+            self.addGroup(
+                get_theme_icon("ic_fluent_resize_20_filled"),
+                get_content_name_async("basic_settings", "background_resident"),
+                get_content_description_async("basic_settings", "background_resident"),
+                self.resident_switch,
+            )
+        if is_setting_visible("basic_settings", "url_protocol"):
+            self.addGroup(
+                get_theme_icon("ic_fluent_link_20_filled"),
+                get_content_name_async("basic_settings", "url_protocol"),
+                get_content_description_async("basic_settings", "url_protocol"),
+                self.url_protocol_switch,
+            )
+        if is_setting_visible("basic_settings", "ipc_port"):
+            self.addGroup(
+                get_theme_icon("ic_fluent_server_20_filled"),
+                get_content_name_async("basic_settings", "ipc_port"),
+                get_content_description_async("basic_settings", "ipc_port"),
+                self.ipc_port_spinbox,
+            )
+
+    def __on_simplified_mode_changed(self, checked):
+        update_settings("basic_settings", "simplified_mode", checked)
+        if checked:
+            show_notification(
+                NotificationType.SUCCESS,
+                NotificationConfig(
+                    title=get_content_name_async("basic_settings", "simplified_mode"),
+                    content=get_any_position_value_async(
+                        "basic_settings", "simplified_mode_notification", "enable"
+                    ),
+                ),
+                parent=self.window(),
+            )
+        else:
+            show_notification(
+                NotificationType.INFO,
+                NotificationConfig(
+                    title=get_content_name_async("basic_settings", "simplified_mode"),
+                    content=get_any_position_value_async(
+                        "basic_settings", "simplified_mode_notification", "disable"
+                    ),
+                ),
+                parent=self.window(),
+            )
 
     def __on_autostart_changed(self, checked):
         update_settings("basic_settings", "autostart", checked)

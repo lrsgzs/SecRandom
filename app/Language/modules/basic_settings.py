@@ -8,6 +8,15 @@ basic_settings = {
             "description": "管理软件的数据导入和导出",
         },
         "personalised": {"name": "个性化", "description": "自定义软件外观和用户体验"},
+        "simplified_mode": {
+            "name": "精简设置模式",
+            "description": "隐藏高级设置项，仅显示推荐设置",
+            "switchbutton_name": {"enable": "", "disable": ""},
+        },
+        "simplified_mode_notification": {
+            "enable": "已开启精简设置模式",
+            "disable": "已关闭精简设置模式",
+        },
         "autostart": {
             "name": "开机自启",
             "description": "设置软件是否随系统启动自动运行",
@@ -195,6 +204,14 @@ basic_settings = {
         "personalised": {
             "name": "Customization",
             "description": "Customize the look and experience of software",
+        },
+        "simplified_mode": {
+            "name": "Simplified mode",
+            "description": "Hide advanced settings, show only recommended settings",
+        },
+        "simplified_mode_notification": {
+            "enable": "Simplified mode enabled",
+            "disable": "Simplified mode disabled",
         },
         "autostart": {
             "name": "Start on boot",

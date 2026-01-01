@@ -18,6 +18,7 @@ from app.tools.settings_access import *
 from app.tools.settings_access import get_safe_font_size
 from app.Language.obtain_language import *
 from app.common.data.list import *
+from app.tools.settings_visibility_manager import is_setting_visible
 
 
 # ==================================================
@@ -398,23 +399,25 @@ class lottery_display_settings(GroupHeaderCardWidget):
         )
 
         # 添加设置项到分组
+        if is_setting_visible("lottery_settings", "use_global_font"):
+            self.addGroup(
+                get_theme_icon("ic_fluent_text_font_20_filled"),
+                get_content_name_async("lottery_settings", "use_global_font"),
+                get_content_description_async("lottery_settings", "use_global_font"),
+                self.use_global_font_combo,
+            )
+        if is_setting_visible("lottery_settings", "custom_font"):
+            self.addGroup(
+                get_theme_icon("ic_fluent_text_font_20_filled"),
+                get_content_name_async("lottery_settings", "custom_font"),
+                get_content_description_async("lottery_settings", "custom_font"),
+                self.custom_font_combo,
+            )
         self.addGroup(
             get_theme_icon("ic_fluent_text_font_20_filled"),
             get_content_name_async("lottery_settings", "font_size"),
             get_content_description_async("lottery_settings", "font_size"),
             self.font_size_spin,
-        )
-        self.addGroup(
-            get_theme_icon("ic_fluent_text_font_20_filled"),
-            get_content_name_async("lottery_settings", "use_global_font"),
-            get_content_description_async("lottery_settings", "use_global_font"),
-            self.use_global_font_combo,
-        )
-        self.addGroup(
-            get_theme_icon("ic_fluent_text_font_20_filled"),
-            get_content_name_async("lottery_settings", "custom_font"),
-            get_content_description_async("lottery_settings", "custom_font"),
-            self.custom_font_combo,
         )
         self.addGroup(
             get_theme_icon("ic_fluent_slide_text_sparkle_20_filled"),
@@ -437,8 +440,9 @@ class lottery_animation_settings(QWidget):
         self.vBoxLayout.addWidget(self.basic_animation_widget)
 
         # 添加颜色主题设置组件
-        self.color_theme_widget = lottery_color_theme_settings(self)
-        self.vBoxLayout.addWidget(self.color_theme_widget)
+        if is_setting_visible("lottery_settings", "color_theme"):
+            self.color_theme_widget = lottery_color_theme_settings(self)
+            self.vBoxLayout.addWidget(self.color_theme_widget)
 
         # 添加奖品图片设置组件
         self.lottery_image_widget = lottery_lottery_image_settings(self)
@@ -503,18 +507,20 @@ class lottery_basic_animation_settings(GroupHeaderCardWidget):
             get_content_description_async("lottery_settings", "animation"),
             self.animation_combo,
         )
-        self.addGroup(
-            get_theme_icon("ic_fluent_timeline_20_filled"),
-            get_content_name_async("lottery_settings", "animation_interval"),
-            get_content_description_async("lottery_settings", "animation_interval"),
-            self.animation_interval_spin,
-        )
-        self.addGroup(
-            get_theme_icon("ic_fluent_slide_play_20_filled"),
-            get_content_name_async("lottery_settings", "autoplay_count"),
-            get_content_description_async("lottery_settings", "autoplay_count"),
-            self.autoplay_count_spin,
-        )
+        if is_setting_visible("lottery_settings", "animation_interval"):
+            self.addGroup(
+                get_theme_icon("ic_fluent_timeline_20_filled"),
+                get_content_name_async("lottery_settings", "animation_interval"),
+                get_content_description_async("lottery_settings", "animation_interval"),
+                self.animation_interval_spin,
+            )
+        if is_setting_visible("lottery_settings", "autoplay_count"):
+            self.addGroup(
+                get_theme_icon("ic_fluent_slide_play_20_filled"),
+                get_content_name_async("lottery_settings", "autoplay_count"),
+                get_content_description_async("lottery_settings", "autoplay_count"),
+                self.autoplay_count_spin,
+            )
 
 
 class lottery_color_theme_settings(GroupHeaderCardWidget):

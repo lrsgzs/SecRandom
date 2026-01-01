@@ -26,6 +26,7 @@ from app.common.safety.usb import has_binding, is_bound_present
 from app.common.safety.secure_store import read_secrets, write_secrets
 from app.common.safety.password import is_configured as password_is_configured
 from app.common.safety.totp import is_configured as totp_is_configured
+from app.tools.settings_visibility_manager import is_setting_visible
 
 
 # ==================================================
@@ -210,18 +211,20 @@ class basic_safety_verification_method(GroupHeaderCardWidget):
             get_content_description_async("basic_safety_settings", "set_password"),
             self.set_password_button,
         )
-        self.addGroup(
-            get_theme_icon("ic_fluent_puzzle_piece_shield_20_filled"),
-            get_content_name_async("basic_safety_settings", "totp_switch"),
-            get_content_description_async("basic_safety_settings", "totp_switch"),
-            self.totp_switch,
-        )
-        self.addGroup(
-            get_theme_icon("ic_fluent_laptop_shield_20_filled"),
-            get_content_name_async("basic_safety_settings", "set_totp"),
-            get_content_description_async("basic_safety_settings", "set_totp"),
-            self.set_totp_button,
-        )
+        if is_setting_visible("basic_safety_settings", "totp_switch"):
+            self.addGroup(
+                get_theme_icon("ic_fluent_puzzle_piece_shield_20_filled"),
+                get_content_name_async("basic_safety_settings", "totp_switch"),
+                get_content_description_async("basic_safety_settings", "totp_switch"),
+                self.totp_switch,
+            )
+        if is_setting_visible("basic_safety_settings", "totp_switch"):
+            self.addGroup(
+                get_theme_icon("ic_fluent_laptop_shield_20_filled"),
+                get_content_name_async("basic_safety_settings", "set_totp"),
+                get_content_description_async("basic_safety_settings", "set_totp"),
+                self.set_totp_button,
+            )
         self.addGroup(
             get_theme_icon("ic_fluent_puzzle_piece_shield_20_filled"),
             get_content_name_async("basic_safety_settings", "usb_switch"),
@@ -242,8 +245,9 @@ class basic_safety_verification_method(GroupHeaderCardWidget):
         )
 
         if not password_is_configured():
-            self.totp_switch.setEnabled(False)
-            self.set_totp_button.setEnabled(False)
+            if is_setting_visible("basic_safety_settings", "totp_switch"):
+                self.totp_switch.setEnabled(False)
+                self.set_totp_button.setEnabled(False)
             self.usb_switch.setEnabled(False)
             self.bind_usb_button.setEnabled(False)
             self.unbind_usb_button.setEnabled(False)
@@ -806,12 +810,15 @@ class basic_safety_security_operations(GroupHeaderCardWidget):
             ),
             self.show_hide_floating_window_switch,
         )
-        self.addGroup(
-            get_theme_icon("ic_fluent_arrow_reset_20_filled"),
-            get_content_name_async("basic_safety_settings", "restart_switch"),
-            get_content_description_async("basic_safety_settings", "restart_switch"),
-            self.restart_switch,
-        )
+        if is_setting_visible("basic_safety_settings", "restart_switch"):
+            self.addGroup(
+                get_theme_icon("ic_fluent_arrow_reset_20_filled"),
+                get_content_name_async("basic_safety_settings", "restart_switch"),
+                get_content_description_async(
+                    "basic_safety_settings", "restart_switch"
+                ),
+                self.restart_switch,
+            )
         self.addGroup(
             get_theme_icon("ic_fluent_arrow_exit_20_filled"),
             get_content_name_async("basic_safety_settings", "exit_switch"),
@@ -826,40 +833,50 @@ class basic_safety_security_operations(GroupHeaderCardWidget):
             ),
             self.open_settings_switch,
         )
-        self.addGroup(
-            get_theme_icon("ic_fluent_data_pie_20_filled"),
-            get_content_name_async("basic_safety_settings", "diagnostic_export_switch"),
-            get_content_description_async(
-                "basic_safety_settings", "diagnostic_export_switch"
-            ),
-            self.diagnostic_export_switch,
-        )
-        self.addGroup(
-            get_theme_icon("ic_fluent_arrow_export_20_filled"),
-            get_content_name_async("basic_safety_settings", "data_export_switch"),
-            get_content_description_async(
-                "basic_safety_settings", "data_export_switch"
-            ),
-            self.data_export_switch,
-        )
-        self.addGroup(
-            get_theme_icon("ic_fluent_arrow_sync_checkmark_20_filled"),
-            get_content_name_async(
-                "basic_safety_settings", "import_version_mismatch_switch"
-            ),
-            get_content_description_async(
-                "basic_safety_settings", "import_version_mismatch_switch"
-            ),
-            self.import_version_mismatch_switch,
-        )
-        self.addGroup(
-            get_theme_icon("ic_fluent_folder_swap_20_filled"),
-            get_content_name_async("basic_safety_settings", "import_overwrite_switch"),
-            get_content_description_async(
-                "basic_safety_settings", "import_overwrite_switch"
-            ),
-            self.import_overwrite_switch,
-        )
+        if is_setting_visible("basic_safety_settings", "diagnostic_export_switch"):
+            self.addGroup(
+                get_theme_icon("ic_fluent_data_pie_20_filled"),
+                get_content_name_async(
+                    "basic_safety_settings", "diagnostic_export_switch"
+                ),
+                get_content_description_async(
+                    "basic_safety_settings", "diagnostic_export_switch"
+                ),
+                self.diagnostic_export_switch,
+            )
+        if is_setting_visible("basic_safety_settings", "data_export_switch"):
+            self.addGroup(
+                get_theme_icon("ic_fluent_arrow_export_20_filled"),
+                get_content_name_async("basic_safety_settings", "data_export_switch"),
+                get_content_description_async(
+                    "basic_safety_settings", "data_export_switch"
+                ),
+                self.data_export_switch,
+            )
+        if is_setting_visible(
+            "basic_safety_settings", "import_version_mismatch_switch"
+        ):
+            self.addGroup(
+                get_theme_icon("ic_fluent_arrow_sync_checkmark_20_filled"),
+                get_content_name_async(
+                    "basic_safety_settings", "import_version_mismatch_switch"
+                ),
+                get_content_description_async(
+                    "basic_safety_settings", "import_version_mismatch_switch"
+                ),
+                self.import_version_mismatch_switch,
+            )
+        if is_setting_visible("basic_safety_settings", "import_overwrite_switch"):
+            self.addGroup(
+                get_theme_icon("ic_fluent_folder_swap_20_filled"),
+                get_content_name_async(
+                    "basic_safety_settings", "import_overwrite_switch"
+                ),
+                get_content_description_async(
+                    "basic_safety_settings", "import_overwrite_switch"
+                ),
+                self.import_overwrite_switch,
+            )
 
         self._ensure_ops_disabled_if_no_password()
 

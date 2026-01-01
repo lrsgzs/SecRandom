@@ -74,18 +74,24 @@ class notification_settings_page(PivotPageTemplate):
     """创建通知服务页面"""
 
     def __init__(self, parent: QFrame = None, is_preview=False):
-        page_config = {
-            "roll_call_notification_settings": get_content_name_async(
-                "roll_call_notification_settings", "title"
-            ),
-            "quick_draw_notification_settings": get_content_name_async(
-                "quick_draw_notification_settings", "title"
-            ),
-            "lottery_notification_settings": get_content_name_async(
-                "lottery_notification_settings", "title"
-            ),
-            # "more_notification_settings": get_content_name_async("more_notification_settings", "title")
-        }
+        if readme_settings_async("basic_settings", "simplified_mode"):
+            page_config = {
+                "quick_draw_notification_settings": get_content_name_async(
+                    "quick_draw_notification_settings", "title"
+                ),
+            }
+        else:
+            page_config = {
+                "roll_call_notification_settings": get_content_name_async(
+                    "roll_call_notification_settings", "title"
+                ),
+                "quick_draw_notification_settings": get_content_name_async(
+                    "quick_draw_notification_settings", "title"
+                ),
+                "lottery_notification_settings": get_content_name_async(
+                    "lottery_notification_settings", "title"
+                ),
+            }
         super().__init__(page_config, parent, is_preview_mode=is_preview)
         self.set_base_path("app.view.settings.notification_settings")
 
@@ -138,16 +144,20 @@ class more_settings_page(PivotPageTemplate):
     """创建更多设置页面"""
 
     def __init__(self, parent: QFrame = None, is_preview=False):
-        page_config = {
-            "fair_draw": get_content_name_async("fair_draw_settings", "title"),
-            "time_settings": get_content_name_async("time_settings", "title"),
-            "music_settings": get_content_name_async("music_settings", "title"),
-            "page_management": get_content_name_async("page_management", "title"),
-            "sidebar_tray_management": get_content_name_async(
-                "sidebar_tray_management", "title"
-            ),
-            # "debug": get_content_name_async("debug", "title"),
-        }
+        if readme_settings_async("basic_settings", "simplified_mode"):
+            page_config = {
+                "time_settings": get_content_name_async("time_settings", "title"),
+            }
+        else:
+            page_config = {
+                "fair_draw": get_content_name_async("fair_draw_settings", "title"),
+                "time_settings": get_content_name_async("time_settings", "title"),
+                "music_settings": get_content_name_async("music_settings", "title"),
+                "page_management": get_content_name_async("page_management", "title"),
+                "sidebar_tray_management": get_content_name_async(
+                    "sidebar_tray_management", "title"
+                ),
+            }
         super().__init__(page_config, parent, is_preview_mode=is_preview)
         self.set_base_path("app.view.settings.more_settings")
 

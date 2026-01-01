@@ -18,6 +18,7 @@ from app.tools.settings_access import *
 from app.tools.settings_access import get_safe_font_size
 from app.Language.obtain_language import *
 from app.common.data.list import *
+from app.tools.settings_visibility_manager import is_setting_visible
 
 
 # ==================================================
@@ -424,18 +425,20 @@ class quick_draw_display_settings(GroupHeaderCardWidget):
         )
 
         # 添加设置项到分组
-        self.addGroup(
-            get_theme_icon("ic_fluent_text_font_size_20_filled"),
-            get_content_name_async("quick_draw_settings", "use_global_font"),
-            get_content_description_async("quick_draw_settings", "use_global_font"),
-            self.use_global_font_combo,
-        )
-        self.addGroup(
-            get_theme_icon("ic_fluent_text_font_20_filled"),
-            get_content_name_async("quick_draw_settings", "custom_font"),
-            get_content_description_async("quick_draw_settings", "custom_font"),
-            self.custom_font_combo,
-        )
+        if is_setting_visible("quick_draw_settings", "use_global_font"):
+            self.addGroup(
+                get_theme_icon("ic_fluent_text_font_size_20_filled"),
+                get_content_name_async("quick_draw_settings", "use_global_font"),
+                get_content_description_async("quick_draw_settings", "use_global_font"),
+                self.use_global_font_combo,
+            )
+        if is_setting_visible("quick_draw_settings", "custom_font"):
+            self.addGroup(
+                get_theme_icon("ic_fluent_text_font_20_filled"),
+                get_content_name_async("quick_draw_settings", "custom_font"),
+                get_content_description_async("quick_draw_settings", "custom_font"),
+                self.custom_font_combo,
+            )
         self.addGroup(
             get_theme_icon("ic_fluent_text_font_20_filled"),
             get_content_name_async("quick_draw_settings", "font_size"),
@@ -469,8 +472,9 @@ class quick_draw_animation_settings(QWidget):
         self.vBoxLayout.addWidget(self.basic_animation_widget)
 
         # 添加颜色主题设置组件
-        self.color_theme_widget = quick_draw_color_theme_settings(self)
-        self.vBoxLayout.addWidget(self.color_theme_widget)
+        if is_setting_visible("quick_draw_settings", "color_theme"):
+            self.color_theme_widget = quick_draw_color_theme_settings(self)
+            self.vBoxLayout.addWidget(self.color_theme_widget)
 
         # 添加学生图片设置组件
         self.student_image_widget = quick_draw_student_image_settings(self)
@@ -539,18 +543,22 @@ class quick_draw_basic_animation_settings(GroupHeaderCardWidget):
             get_content_description_async("quick_draw_settings", "animation"),
             self.animation_combo,
         )
-        self.addGroup(
-            get_theme_icon("ic_fluent_timeline_20_filled"),
-            get_content_name_async("quick_draw_settings", "animation_interval"),
-            get_content_description_async("quick_draw_settings", "animation_interval"),
-            self.animation_interval_spin,
-        )
-        self.addGroup(
-            get_theme_icon("ic_fluent_slide_play_20_filled"),
-            get_content_name_async("quick_draw_settings", "autoplay_count"),
-            get_content_description_async("quick_draw_settings", "autoplay_count"),
-            self.autoplay_count_spin,
-        )
+        if is_setting_visible("quick_draw_settings", "animation_interval"):
+            self.addGroup(
+                get_theme_icon("ic_fluent_timeline_20_filled"),
+                get_content_name_async("quick_draw_settings", "animation_interval"),
+                get_content_description_async(
+                    "quick_draw_settings", "animation_interval"
+                ),
+                self.animation_interval_spin,
+            )
+        if is_setting_visible("quick_draw_settings", "autoplay_count"):
+            self.addGroup(
+                get_theme_icon("ic_fluent_slide_play_20_filled"),
+                get_content_name_async("quick_draw_settings", "autoplay_count"),
+                get_content_description_async("quick_draw_settings", "autoplay_count"),
+                self.autoplay_count_spin,
+            )
 
 
 class quick_draw_color_theme_settings(GroupHeaderCardWidget):
