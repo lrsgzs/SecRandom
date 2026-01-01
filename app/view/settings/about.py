@@ -32,15 +32,24 @@ class about(GroupHeaderCardWidget):
         self.about_github_Button = HyperlinkButton(
             FIF.GITHUB, GITHUB_WEB, get_content_name_async("about", "github")
         )
+        github_widget = self._create_button_with_icon(
+            self.about_github_Button, "assets/icon", "sectl-icon.png"
+        )
 
         # 打开bilibili按钮
         self.about_bilibili_Button = HyperlinkButton(
-            BILIBILI_WEB, get_content_name_async("about", "bilibili")
+            FIF.GLOBE, BILIBILI_WEB, get_content_name_async("about", "bilibili")
+        )
+        bilibili_widget = self._create_button_with_icon(
+            self.about_bilibili_Button, "assets/contribution", "contributor1.png"
         )
 
         # 打开网站按钮
         self.about_website_Button = HyperlinkButton(
-            WEBSITE, get_content_name_async("about", "website")
+            FIF.GLOBE, WEBSITE, get_content_name_async("about", "website")
+        )
+        website_widget = self._create_button_with_icon(
+            self.about_website_Button, "assets/icon", "secrandom-icon-paper.png"
         )
 
         # 查看当前软件版本号
@@ -53,7 +62,11 @@ class about(GroupHeaderCardWidget):
             copyright_text = f"Copyright © {INITIAL_AUTHORING_YEAR} {COPYRIGHT_HOLDER}"
         else:
             copyright_text = f"Copyright © {INITIAL_AUTHORING_YEAR}-{CURRENT_YEAR} {COPYRIGHT_HOLDER}"
+
         self.about_author_label = BodyLabel(copyright_text)
+        copyright_widget = self._create_label_with_icon(
+            self.about_author_label, "assets/icon", "sectl-icon.png"
+        )
 
         # 创建贡献人员按钮
         self.contributor_button = PushButton(
@@ -75,13 +88,13 @@ class about(GroupHeaderCardWidget):
             get_theme_icon("ic_fluent_branch_fork_link_20_filled"),
             get_content_name_async("about", "bilibili"),
             get_content_description_async("about", "bilibili"),
-            self.about_bilibili_Button,
+            bilibili_widget,
         )
         self.addGroup(
             FIF.GITHUB,
             get_content_name_async("about", "github"),
             get_content_description_async("about", "github"),
-            self.about_github_Button,
+            github_widget,
         )
         self.addGroup(
             get_theme_icon("ic_fluent_document_person_20_filled"),
@@ -99,13 +112,13 @@ class about(GroupHeaderCardWidget):
             get_theme_icon("ic_fluent_class_20_filled"),
             get_content_name_async("about", "copyright"),
             get_content_description_async("about", "copyright"),
-            self.about_author_label,
+            copyright_widget,
         )
         self.addGroup(
             FIF.GLOBE,
             get_content_name_async("about", "website"),
             get_content_description_async("about", "website"),
-            self.about_website_Button,
+            website_widget,
         )
         self.addGroup(
             get_theme_icon("ic_fluent_info_20_filled"),
@@ -121,3 +134,39 @@ class about(GroupHeaderCardWidget):
     def open_donation_url(self):
         """打开捐赠链接"""
         QDesktopServices.openUrl(QUrl(DONATION_URL))
+
+    def _create_button_with_icon(self, button, icon_dir, icon_name):
+        """创建带图标的按钮容器"""
+        widget = QWidget()
+        layout = QHBoxLayout(widget)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(8)
+
+        layout.addWidget(button)
+
+        icon_path = get_data_path(icon_dir, icon_name)
+        icon_label = ImageLabel(f"{icon_path}")
+        icon_label.scaledToHeight(30)
+        icon_label.setBorderRadius(8, 8, 8, 8)
+        layout.addWidget(icon_label)
+
+        layout.addStretch()
+        return widget
+
+    def _create_label_with_icon(self, label, icon_dir, icon_name):
+        """创建带图标的标签容器"""
+        widget = QWidget()
+        layout = QHBoxLayout(widget)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(8)
+
+        layout.addWidget(label)
+
+        icon_path = get_data_path(icon_dir, icon_name)
+        icon_label = ImageLabel(f"{icon_path}")
+        icon_label.scaledToHeight(30)
+        icon_label.setBorderRadius(8, 8, 8, 8)
+        layout.addWidget(icon_label)
+
+        layout.addStretch()
+        return widget
