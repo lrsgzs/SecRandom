@@ -12,6 +12,7 @@ import zipfile
 import aiohttp
 from loguru import logger
 import yaml
+from PySide6.QtCore import QObject, Signal, QThread
 from app.tools.path_utils import *
 from app.tools.variable import *
 from app.tools.settings_access import *
@@ -437,16 +438,44 @@ async def get_metadata_info_async() -> dict | None:
     Returns:
         dict: metadata.yaml 文件的内容，如果读取失败则返回 None
     """
-    # 按优先级排序的镜像源列表
-    sources = sorted(UPDATE_SOURCES, key=lambda x: x["priority"])
     repo_url = GITHUB_WEB
     github_raw_url = f"{repo_url}/raw/master/metadata.yaml"
 
-    # 依次尝试每个镜像源
-    for source in sources:
-        try:
+    # 读取更新源设置
+    update_source = readme_settings("update", "update_source")
+    logger.debug(f"更新源设置: {update_source}")
+
+    # 如果选择自动检测延迟（索引0），则测试所有镜像源
+    if update_source == 0:
+        # 测试所有镜像源的延迟
+        logger.info("开始测试镜像源延迟以获取 metadata.yaml...")
+        tasks = []
+        for source in UPDATE_SOURCES:
+            task = test_source_latency(source["url"])
+            tasks.append(task)
+
+        # 等待所有测试完成
+        latencies = await asyncio.gather(*tasks, return_exceptions=True)
+
+        # 按延迟排序镜像源
+        sorted_sources = []
+        for i, latency in enumerate(latencies):
+            if isinstance(latency, Exception):
+                logger.debug(
+                    f"镜像源 {UPDATE_SOURCES[i]['name']} 测试失败，延迟设为无穷大"
+                )
+                latency = float("inf")
+            sorted_sources.append((latency, UPDATE_SOURCES[i]))
+
+        # 按延迟升序排序
+        sorted_sources.sort(key=lambda x: x[0])
+
+        # 按延迟顺序尝试获取 metadata.yaml
+        for latency, source in sorted_sources:
             source_url = source["url"]
-            logger.debug(f"尝试使用镜像源 {source['name']} 获取 metadata.yaml")
+            logger.debug(
+                f"尝试使用镜像源 {source['name']} (延迟: {latency:.2f}ms) 获取 metadata.yaml"
+            )
 
             # 构建更新检查 URL
             if source_url == "https://github.com":
@@ -456,22 +485,71 @@ async def get_metadata_info_async() -> dict | None:
 
             logger.debug(f"从网络获取 metadata.yaml: {update_check_url}")
 
-            async with aiohttp.ClientSession() as session:
-                async with session.get(update_check_url, timeout=30) as response:
-                    response.raise_for_status()
-                    content = await response.text()
-                    metadata = yaml.safe_load(content)
-                    logger.debug(
-                        f"成功使用镜像源 {source['name']} 读取 metadata.yaml 文件"
-                    )
-                    return metadata
-        except Exception as e:
-            logger.warning(f"使用镜像源 {source['name']} 获取 metadata.yaml 失败: {e}")
-            continue
+            try:
+                # 设置较短的超时时间，避免卡住
+                client_timeout = aiohttp.ClientTimeout(
+                    total=10,  # 总超时 10 秒
+                    connect=5,  # 连接超时 5 秒
+                    sock_read=5,  # 读取超时 5 秒
+                )
+                async with aiohttp.ClientSession(timeout=client_timeout) as session:
+                    async with session.get(update_check_url) as response:
+                        response.raise_for_status()
+                        content = await response.text()
+                        metadata = yaml.safe_load(content)
+                        logger.info(
+                            f"成功使用镜像源 {source['name']} (延迟: {latency:.2f}ms) 读取 metadata.yaml 文件"
+                        )
+                        return metadata
+            except Exception as e:
+                logger.warning(
+                    f"使用镜像源 {source['name']} 获取 metadata.yaml 失败: {e}"
+                )
+                continue
 
-    # 所有镜像源都失败了
-    logger.error("所有镜像源都获取 metadata.yaml 文件失败")
-    return None
+        # 所有镜像源都失败了
+        logger.error("所有镜像源都获取 metadata.yaml 文件失败")
+        return None
+    else:
+        # 使用指定的更新源
+        source_index = update_source - 1  # 转换为0-based索引
+        if 0 <= source_index < len(UPDATE_SOURCES):
+            source = UPDATE_SOURCES[source_index]
+            source_url = source["url"]
+            logger.debug(f"使用指定的更新源 {source['name']} 获取 metadata.yaml")
+
+            # 构建更新检查 URL
+            if source_url == "https://github.com":
+                update_check_url = github_raw_url
+            else:
+                update_check_url = f"{source_url}/{github_raw_url}"
+
+            logger.debug(f"从网络获取 metadata.yaml: {update_check_url}")
+
+            try:
+                # 设置较短的超时时间，避免卡住
+                client_timeout = aiohttp.ClientTimeout(
+                    total=10,  # 总超时 10 秒
+                    connect=5,  # 连接超时 5 秒
+                    sock_read=5,  # 读取超时 5 秒
+                )
+                async with aiohttp.ClientSession(timeout=client_timeout) as session:
+                    async with session.get(update_check_url) as response:
+                        response.raise_for_status()
+                        content = await response.text()
+                        metadata = yaml.safe_load(content)
+                        logger.info(
+                            f"成功使用指定的更新源 {source['name']} 读取 metadata.yaml 文件"
+                        )
+                        return metadata
+            except Exception as e:
+                logger.error(
+                    f"使用指定的更新源 {source['name']} 获取 metadata.yaml 失败: {e}"
+                )
+                return None
+        else:
+            logger.error(f"无效的更新源索引: {source_index}")
+            return None
 
 
 def get_metadata_info() -> dict | None:
@@ -1214,3 +1292,529 @@ def install_update(file_path: str) -> bool:
         bool: 安装成功返回 True，否则返回 False
     """
     return _run_async_func(install_update_async, file_path)
+
+
+# ==================================================
+# 全局更新状态管理器
+# ==================================================
+class UpdateStatusManager(QObject):
+    """全局更新状态管理器，用于在更新页面创建前后同步状态"""
+
+    status_changed = Signal(str)  # 状态变化信号
+    download_progress_updated = Signal(int, str)  # 下载进度更新信号
+    ui_state_changed = Signal(dict)  # UI状态变化信号
+
+    def __init__(self):
+        super().__init__()
+        self.status = (
+            "idle"  # idle, checking, new_version, downloading, completed, failed
+        )
+        self.latest_version = None
+        self.download_progress = 0
+        self.download_speed = ""
+        self.download_total = ""
+        self.download_file_path = None
+        self.error_message = None
+        self.download_cancelled = False  # 下载取消标志位
+
+        # UI状态
+        self.download_install_button_visible = False
+        self.download_install_button_enabled = True
+        self.check_update_button_enabled = True
+        self.cancel_update_button_visible = False
+        self.cancel_update_button_enabled = True
+        self.download_progress_visible = False
+        self.download_info_label_visible = False
+        self.download_info_label_text = ""
+        self.indeterminate_ring_visible = False
+        self.status_label_text = ""
+
+    def cancel_download(self):
+        """取消下载"""
+        self.download_cancelled = True
+
+    def reset_cancel_flag(self):
+        """重置取消标志位"""
+        self.download_cancelled = False
+
+    def set_checking(self):
+        """设置正在检查更新的状态"""
+        self.status = "checking"
+        self.latest_version = None
+        self.download_progress = 0
+        self.download_speed = ""
+        self.download_total = ""
+        self.download_file_path = None
+        self.error_message = None
+
+        # 更新UI状态
+        self.indeterminate_ring_visible = True
+        self.check_update_button_enabled = False
+        self.download_install_button_visible = False
+        self.status_label_text = ""
+
+        self.status_changed.emit("checking")
+        self._emit_ui_state()
+
+    def set_new_version(self, version):
+        """设置发现新版本的状态"""
+        self.status = "new_version"
+        self.latest_version = version
+
+        # 更新UI状态
+        self.indeterminate_ring_visible = False
+        self.download_install_button_visible = True
+        self.download_install_button_enabled = True
+        self.check_update_button_enabled = True
+        self.status_label_text = ""
+
+        self.status_changed.emit("new_version")
+        self._emit_ui_state()
+
+    def set_downloading(self):
+        """设置正在下载的状态"""
+        self.status = "downloading"
+        self.download_cancelled = False  # 重置取消标志位
+
+        # 更新UI状态
+        self.indeterminate_ring_visible = False
+        self.download_progress_visible = True
+        self.download_info_label_visible = True
+        self.cancel_update_button_visible = True
+        self.cancel_update_button_enabled = True
+        self.download_install_button_enabled = False
+        self.check_update_button_enabled = False
+        self.status_label_text = ""
+
+        self.status_changed.emit("downloading")
+        self._emit_ui_state()
+
+    def update_download_progress(self, progress, speed):
+        """更新下载进度"""
+        self.download_progress = progress
+        self.download_speed = speed
+        self.download_info_label_text = f"{speed}"
+        self.download_progress_updated.emit(progress, speed)
+        self._emit_ui_state()
+
+    def set_download_complete(self, file_path):
+        """设置下载完成的状态"""
+        self.status = "completed"
+        self.download_file_path = file_path
+
+        # 更新UI状态
+        self.indeterminate_ring_visible = False
+        self.download_progress_visible = False
+        self.download_info_label_visible = True
+        self.cancel_update_button_visible = False
+        self.download_install_button_visible = True
+        self.download_install_button_enabled = True
+        self.check_update_button_enabled = True
+        self.status_label_text = ""
+
+        self.status_changed.emit("completed")
+        self._emit_ui_state()
+
+    def set_download_complete_with_size(self, file_path, file_size):
+        """设置下载完成的状态（包含文件大小）"""
+        self.status = "completed"
+        self.download_file_path = file_path
+        self.download_info_label_text = file_size
+
+        # 更新UI状态
+        self.indeterminate_ring_visible = False
+        self.download_progress_visible = False
+        self.download_info_label_visible = True
+        self.cancel_update_button_visible = False
+        self.download_install_button_visible = True
+        self.download_install_button_enabled = True
+        self.check_update_button_enabled = True
+        self.status_label_text = ""
+
+        self.status_changed.emit("completed")
+        self._emit_ui_state()
+
+    def set_download_failed(self):
+        """设置下载失败的状态"""
+        self.status = "failed"
+
+        # 更新UI状态
+        self.indeterminate_ring_visible = False
+        self.download_progress_visible = False
+        self.download_info_label_visible = False
+        self.cancel_update_button_visible = False
+        self.download_install_button_enabled = True
+        self.check_update_button_enabled = True
+        self.status_label_text = ""
+
+        self.status_changed.emit("failed")
+        self._emit_ui_state()
+
+    def set_check_failed(self):
+        """设置检查失败的状态"""
+        self.status = "failed"
+
+        # 更新UI状态
+        self.indeterminate_ring_visible = False
+        self.download_install_button_visible = False
+        self.check_update_button_enabled = True
+        self.status_label_text = ""
+
+        self.status_changed.emit("failed")
+        self._emit_ui_state()
+
+    def set_latest_version(self):
+        """设置已是最新版本的状态"""
+        self.status = "idle"
+
+        # 更新UI状态
+        self.indeterminate_ring_visible = False
+        self.download_install_button_visible = False
+        self.check_update_button_enabled = True
+        self.status_label_text = ""
+
+        self.status_changed.emit("idle")
+        self._emit_ui_state()
+
+    def set_download_cancelled(self):
+        """设置下载被取消的状态"""
+        self.status = "new_version"  # 恢复到新版本状态，而不是idle
+        self.download_cancelled = False  # 重置取消标志位
+
+        # 更新UI状态
+        self.indeterminate_ring_visible = False
+        self.download_progress_visible = False
+        self.download_info_label_visible = False
+        self.cancel_update_button_visible = False
+        self.download_install_button_visible = True  # 显示下载按钮
+        self.download_install_button_enabled = True
+        self.check_update_button_enabled = True
+        self.status_label_text = ""
+
+        self.status_changed.emit("new_version")
+        self._emit_ui_state()
+
+    def _emit_ui_state(self):
+        """发送UI状态信号"""
+        ui_state = {
+            "download_install_button_visible": self.download_install_button_visible,
+            "download_install_button_enabled": self.download_install_button_enabled,
+            "check_update_button_enabled": self.check_update_button_enabled,
+            "cancel_update_button_visible": self.cancel_update_button_visible,
+            "cancel_update_button_enabled": self.cancel_update_button_enabled,
+            "download_progress_visible": self.download_progress_visible,
+            "download_info_label_visible": self.download_info_label_visible,
+            "download_info_label_text": self.download_info_label_text,
+            "indeterminate_ring_visible": self.indeterminate_ring_visible,
+            "status_label_text": self.status_label_text,
+        }
+        self.ui_state_changed.emit(ui_state)
+
+
+# 全局更新状态管理器实例
+update_status_manager = UpdateStatusManager()
+
+# 全局更新检查线程实例
+update_check_thread = None
+
+
+# ==================================================
+# 启动时自动更新检查
+# ==================================================
+class UpdateCheckThread(QThread):
+    """更新检查线程，用于在后台执行更新检查"""
+
+    def __init__(self, settings_window=None):
+        super().__init__()
+        self.settings_window = settings_window
+
+    def run(self):
+        """执行更新检查"""
+        loop = None
+        try:
+            from app.tools.config import send_system_notification
+            from app.Language.obtain_language import get_content_name_async
+            from PySide6.QtCore import QDateTime
+
+            # 创建新的事件循环
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+
+            # 辅助函数：安全地调用更新页面的方法
+            def safe_call_update_interface(method_name, *args):
+                """安全地调用更新页面的方法"""
+                if self.settings_window and hasattr(
+                    self.settings_window, "updateInterface"
+                ):
+                    update_iface = self.settings_window.updateInterface
+                    if hasattr(update_iface, method_name):
+                        method = getattr(update_iface, method_name)
+                        # 直接调用方法，方法内部已经使用 QMetaObject.invokeMethod 确保在主线程执行
+                        method(*args)
+
+            # 读取自动更新模式设置
+            auto_update_mode = readme_settings_async("update", "auto_update_mode")
+            logger.debug(f"自动更新模式: {auto_update_mode}")
+
+            # 如果是模式0（不自动检查更新），直接返回
+            if auto_update_mode == 0:
+                logger.debug("自动更新模式为0，不执行更新检查")
+                return
+
+            # 通知更新页面开始检查
+            safe_call_update_interface("set_checking_status")
+            # 更新全局状态
+            update_status_manager.set_checking()
+
+            # 获取最新版本信息（使用异步方式）
+            logger.debug("开始检查更新")
+            latest_version_info = loop.run_until_complete(get_latest_version_async())
+
+            if not latest_version_info:
+                logger.debug("获取最新版本信息失败")
+                # 通知更新页面检查失败
+                safe_call_update_interface("set_check_failed")
+                # 更新全局状态
+                update_status_manager.set_check_failed()
+                return
+
+            latest_version = latest_version_info["version"]
+            latest_version_no = latest_version_info["version_no"]
+
+            # 比较版本号
+            compare_result = compare_versions(VERSION, latest_version)
+
+            # 获取下载文件夹路径
+            download_dir = get_data_path("downloads")
+            ensure_dir(download_dir)
+
+            # 构建预期的文件名
+            expected_filename = DEFAULT_NAME_FORMAT
+            expected_filename = expected_filename.replace("[version]", latest_version)
+            expected_filename = expected_filename.replace("[system]", SYSTEM)
+            expected_filename = expected_filename.replace("[arch]", ARCH)
+            expected_filename = expected_filename.replace("[struct]", STRUCT)
+            expected_file_path = download_dir / expected_filename
+
+            # 检查是否有已下载的更新文件（模式3：自动安装）
+            if (
+                expected_file_path.exists()
+                and compare_result == 1
+                and auto_update_mode == 3
+            ):
+                logger.debug(
+                    f"发现已下载的更新文件，开始验证完整性: {expected_file_path}"
+                )
+                # 验证文件完整性
+                file_integrity_ok = check_update_file_integrity(str(expected_file_path))
+
+                if file_integrity_ok:
+                    # 文件完整，可以直接安装
+                    logger.debug(
+                        f"文件完整性验证通过，开始自动安装: {expected_file_path}"
+                    )
+                    # 自动安装更新
+                    success = install_update(str(expected_file_path))
+                    if success:
+                        logger.debug("自动安装更新成功")
+                    else:
+                        logger.error("自动安装更新失败")
+                    return
+                else:
+                    # 文件损坏，需要重新下载
+                    logger.warning(
+                        f"已下载的文件损坏，将重新下载: {expected_file_path}"
+                    )
+                    # 删除损坏的文件
+                    try:
+                        expected_file_path.unlink()
+                        logger.debug(f"已删除损坏的文件: {expected_file_path}")
+                    except Exception as e:
+                        logger.error(f"删除损坏文件失败: {e}")
+                    # 继续执行下载流程
+
+            if compare_result == 1:
+                # 有新版本
+                logger.debug(f"发现新版本: {latest_version}")
+
+                # 通知更新页面发现新版本
+                safe_call_update_interface("set_new_version_available", latest_version)
+                # 更新全局状态
+                update_status_manager.set_new_version(latest_version)
+
+                # 发送系统通知
+                title = get_content_name_async("update", "update_notification_title")
+                content = get_content_name_async(
+                    "update", "update_notification_content"
+                ).format(version=latest_version)
+                send_system_notification(
+                    title, content, url="https://secrandom.netlify.app/download"
+                )
+
+                # 如果是模式2或3，自动下载更新
+                if auto_update_mode in [2, 3]:
+                    logger.debug(f"自动更新模式为{auto_update_mode}，开始自动下载更新")
+
+                    # 检查文件是否已存在
+                    if expected_file_path.exists():
+                        logger.debug(f"检测到已下载的更新文件: {expected_file_path}")
+                        # 验证文件完整性
+                        file_integrity_ok = check_update_file_integrity(
+                            str(expected_file_path)
+                        )
+
+                        if file_integrity_ok:
+                            # 文件完整，可以直接使用
+                            logger.debug(f"文件完整性验证通过: {expected_file_path}")
+
+                            # 获取文件大小
+                            file_size = expected_file_path.stat().st_size
+
+                            def format_size(size_bytes):
+                                """格式化文件大小"""
+                                if size_bytes < 1024:
+                                    return f"{size_bytes} B"
+                                elif size_bytes < 1024 * 1024:
+                                    return f"{size_bytes / 1024:.1f} KB"
+                                else:
+                                    return f"{size_bytes / (1024 * 1024):.1f} MB"
+
+                            file_size_str = format_size(file_size)
+
+                            # 通知更新页面下载完成，并传递文件大小
+                            safe_call_update_interface(
+                                "set_download_complete_with_size",
+                                str(expected_file_path),
+                                file_size_str,
+                            )
+                            return
+                        else:
+                            # 文件损坏，需要重新下载
+                            logger.warning(
+                                f"已下载的文件损坏，将重新下载: {expected_file_path}"
+                            )
+                            # 删除损坏的文件
+                            try:
+                                expected_file_path.unlink()
+                                logger.debug(f"已删除损坏的文件: {expected_file_path}")
+                            except Exception as e:
+                                logger.error(f"删除损坏文件失败: {e}")
+                            # 继续执行下载流程
+
+                    # 通知更新页面开始下载
+                    safe_call_update_interface("set_downloading_status")
+                    # 更新全局状态
+                    update_status_manager.set_downloading()
+
+                    # 定义进度回调函数
+                    def progress_callback(downloaded: int, total: int):
+                        if total > 0:
+                            progress = int((downloaded / total) * 100)
+                            # 计算下载速度
+                            current_time = (
+                                QDateTime.currentDateTime().toMSecsSinceEpoch()
+                            )
+                            elapsed = (current_time - start_time) / 1000  # 秒
+                            speed = downloaded / elapsed if elapsed > 0 else 0
+                            speed_str = f"{speed / 1024 / 1024:.2f} MB/s"
+                            total_str = f"{total / 1024 / 1024:.2f} MB"
+                            downloaded_str = f"{downloaded / 1024 / 1024:.2f} MB"
+                            # 通知更新页面更新进度，包含已下载大小和进度百分比
+                            safe_call_update_interface(
+                                "update_download_progress",
+                                progress,
+                                f"{speed_str}/s | {downloaded_str} / {total_str} ({progress}%)",
+                            )
+                            # 更新全局状态
+                            update_status_manager.update_download_progress(
+                                progress,
+                                f"{speed_str}/s | {downloaded_str} / {total_str} ({progress}%)",
+                            )
+
+                    start_time = QDateTime.currentDateTime().toMSecsSinceEpoch()
+
+                    # 自动下载更新（使用异步方式）
+                    file_path = loop.run_until_complete(
+                        download_update_async(
+                            latest_version,
+                            progress_callback=progress_callback,
+                            cancel_check=lambda: update_status_manager.download_cancelled,
+                        )
+                    )
+                    if file_path:
+                        logger.debug(f"自动下载更新成功: {file_path}")
+
+                        # 获取文件大小
+                        from pathlib import Path
+
+                        file_size = Path(file_path).stat().st_size
+
+                        def format_size(size_bytes):
+                            """格式化文件大小"""
+                            if size_bytes < 1024:
+                                return f"{size_bytes} B"
+                            elif size_bytes < 1024 * 1024:
+                                return f"{size_bytes / 1024:.1f} KB"
+                            else:
+                                return f"{size_bytes / (1024 * 1024):.1f} MB"
+
+                        file_size_str = format_size(file_size)
+
+                        # 通知更新页面下载完成，并传递文件大小
+                        safe_call_update_interface(
+                            "set_download_complete_with_size", file_path, file_size_str
+                        )
+                        # 更新全局状态
+                        update_status_manager.set_download_complete_with_size(
+                            file_path, file_size_str
+                        )
+                    elif update_status_manager.download_cancelled:
+                        # 下载被取消
+                        logger.info("自动下载更新已被用户取消")
+                        # 通知更新页面下载被取消
+                        safe_call_update_interface("set_download_cancelled")
+                        # 更新全局状态
+                        update_status_manager.set_download_cancelled()
+                    else:
+                        logger.error("自动下载更新失败")
+                        # 通知更新页面下载失败
+                        safe_call_update_interface("set_download_failed")
+                        # 更新全局状态
+                        update_status_manager.set_download_failed()
+            elif compare_result == 0:
+                # 当前是最新版本
+                logger.debug("当前已是最新版本")
+                # 通知更新页面已是最新版本
+                safe_call_update_interface("set_latest_version")
+            else:
+                # 版本比较失败
+                logger.debug("版本比较失败")
+                # 通知更新页面检查失败
+                safe_call_update_interface("set_check_failed")
+
+            # 更新上次检查时间
+            safe_call_update_interface("update_last_check_time")
+        except Exception as e:
+            logger.error(f"启动时检查更新失败: {e}")
+            # 通知更新页面检查失败
+            safe_call_update_interface("set_check_failed")
+        finally:
+            # 关闭事件循环
+            if loop and not loop.is_closed():
+                loop.close()
+
+
+def check_for_updates_on_startup(settings_window=None):
+    """
+    应用启动时检查更新
+    根据自动更新模式设置执行相应的更新操作
+    异步执行，避免阻塞应用启动进程
+
+    Args:
+        settings_window: 设置窗口实例，用于通知更新页面状态变化
+    """
+    global update_check_thread
+    # 创建并启动更新检查线程
+    update_check_thread = UpdateCheckThread(settings_window)
+    update_check_thread.start()
+    return update_check_thread

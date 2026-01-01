@@ -467,19 +467,25 @@ class ResultDisplayUtils:
 
         for i, (num, selected, exist) in enumerate(selected_students):
             current_image_path = None
-            # 在小组模式下，尝试使用小组名称作为图片文件名
+            # 根据settings_group确定图片目录
             if show_student_image:
                 image_name = str(selected)
+                # 根据settings_group选择不同的图片目录
+                if settings_group == "lottery_settings":
+                    image_dir = "prize_images"
+                else:
+                    image_dir = "student_images"
+
                 # 内存优化：使用生成器表达式减少内存分配
                 for ext in (
                     ext
                     for ext in SUPPORTED_IMAGE_EXTENSIONS
                     if file_exists(
-                        get_data_path("images", f"students/{image_name}{ext}")
+                        get_data_path("images", f"{image_dir}/{image_name}{ext}")
                     )
                 ):
                     current_image_path = str(
-                        get_data_path("images", f"students/{image_name}{ext}")
+                        get_data_path("images", f"{image_dir}/{image_name}{ext}")
                     )
                     break
 

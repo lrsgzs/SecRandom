@@ -175,7 +175,14 @@ LIGHTNESS_THRESHOLD = 127  # 浅色/深色主题亮度阈值
 RGB_COLOR_FORMAT = "rgb({r},{g},{b})"  # RGB颜色格式字符串
 
 # 图片相关
-SUPPORTED_IMAGE_EXTENSIONS = [".png", ".jpg", ".jpeg", ".svg"]  # 支持的图片扩展名
+SUPPORTED_IMAGE_EXTENSIONS = [
+    ".png",
+    ".jpg",
+    ".jpeg",
+    ".svg",
+    ".webp",
+    ".gif",
+]  # 支持的图片扩展名
 
 # 格式化相关
 STUDENT_ID_FORMAT = "{num:02}"  # 学号格式化字符串

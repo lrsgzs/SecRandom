@@ -54,7 +54,7 @@ update = {
         "update_source": {
             "name": "更新源选择",
             "description": "选择软件更新下载来源",
-            "combo_items": ["github", "ghfast", "gh-proxy"],
+            "combo_items": ["自动检测延迟", "github", "ghfast", "gh-proxy"],
         },
     },
     "EN_US": {
@@ -109,7 +109,12 @@ update = {
         "update_source": {
             "name": "Update source selection",
             "description": "Select source of download for software update",
-            "combo_items": {"0": "GitHub", "1": "ghfast", "2": "gh-proxy"},
+            "combo_items": {
+                "0": "Auto detect delay",
+                "1": "GitHub",
+                "2": "ghfast",
+                "3": "gh-proxy",
+            },
         },
         "force_check": {"name": "Force check for updates"},
         "already_downloaded_same_version": {
