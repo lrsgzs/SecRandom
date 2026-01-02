@@ -23,9 +23,9 @@ from app.common.extraction.cses_parser import CSESParser
 
 
 # ==================================================
-# 时间设置
+# 课程相关
 # ==================================================
-class time_settings(QWidget):
+class course_settings(QWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
         # 创建垂直布局
@@ -37,6 +37,10 @@ class time_settings(QWidget):
         self.class_break_widget = class_break_settings(self)
         self.vBoxLayout.addWidget(self.class_break_widget)
 
+        # 添加课前重置设置组件
+        self.pre_class_reset_widget = pre_class_reset_settings(self)
+        self.vBoxLayout.addWidget(self.pre_class_reset_widget)
+
         # 添加CSES导入组件
         self.cses_import_widget = cses_import_settings(self)
         self.vBoxLayout.addWidget(self.cses_import_widget)
@@ -46,25 +50,25 @@ class class_break_settings(GroupHeaderCardWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setTitle(
-            get_content_name_async("time_settings", "class_break_settings", "name")
+            get_content_name_async("course_settings", "class_break_settings", "name")
         )
         self.setBorderRadius(8)
 
         # 课间禁用开关
         self.class_break_switch = SwitchButton()
         self.class_break_switch.setOffText(
-            get_content_name_async("time_settings", "disable")
+            get_content_name_async("course_settings", "disable")
         )
         self.class_break_switch.setOnText(
-            get_content_name_async("time_settings", "enable")
+            get_content_name_async("course_settings", "enable")
         )
         instant_draw_disable = readme_settings_async(
-            "time_settings", "instant_draw_disable"
+            "course_settings", "instant_draw_disable"
         )
         self.class_break_switch.setChecked(instant_draw_disable)
         self.class_break_switch.checkedChanged.connect(
             lambda: update_settings(
-                "time_settings",
+                "course_settings",
                 "instant_draw_disable",
                 self.class_break_switch.isChecked(),
             )
@@ -73,18 +77,18 @@ class class_break_settings(GroupHeaderCardWidget):
         # 验证流程开关
         self.verification_switch = SwitchButton()
         self.verification_switch.setOffText(
-            get_content_name_async("time_settings", "disable")
+            get_content_name_async("course_settings", "disable")
         )
         self.verification_switch.setOnText(
-            get_content_name_async("time_settings", "enable")
+            get_content_name_async("course_settings", "enable")
         )
         verification_required = readme_settings_async(
-            "time_settings", "verification_required"
+            "course_settings", "verification_required"
         )
         self.verification_switch.setChecked(verification_required)
         self.verification_switch.checkedChanged.connect(
             lambda: update_settings(
-                "time_settings",
+                "course_settings",
                 "verification_required",
                 self.verification_switch.isChecked(),
             )
@@ -93,18 +97,18 @@ class class_break_settings(GroupHeaderCardWidget):
         # ClassIsland数据源开关
         self.class_island_source_switch = SwitchButton()
         self.class_island_source_switch.setOffText(
-            get_content_name_async("time_settings", "disable")
+            get_content_name_async("course_settings", "disable")
         )
         self.class_island_source_switch.setOnText(
-            get_content_name_async("time_settings", "enable")
+            get_content_name_async("course_settings", "enable")
         )
         class_island_source_enabled = readme_settings_async(
-            "time_settings", "class_island_source_enabled"
+            "course_settings", "class_island_source_enabled"
         )
         self.class_island_source_switch.setChecked(class_island_source_enabled)
         self.class_island_source_switch.checkedChanged.connect(
             lambda: update_settings(
-                "time_settings",
+                "course_settings",
                 "class_island_source_enabled",
                 self.class_island_source_switch.isChecked(),
             )
@@ -113,23 +117,88 @@ class class_break_settings(GroupHeaderCardWidget):
         # 添加设置项到分组
         self.addGroup(
             get_theme_icon("ic_fluent_clock_lock_20_filled"),
-            get_content_name_async("time_settings", "class_break_function"),
-            get_content_description_async("time_settings", "class_break_function"),
+            get_content_name_async("course_settings", "class_break_function"),
+            get_content_description_async("course_settings", "class_break_function"),
             self.class_break_switch,
         )
         self.addGroup(
             get_theme_icon("ic_fluent_shield_lock_20_filled"),
-            get_content_name_async("time_settings", "verification_function"),
-            get_content_description_async("time_settings", "verification_function"),
+            get_content_name_async("course_settings", "verification_function"),
+            get_content_description_async("course_settings", "verification_function"),
             self.verification_switch,
         )
         self.addGroup(
             get_theme_icon("ic_fluent_desktop_mac_20_filled"),
-            get_content_name_async("time_settings", "class_island_source_function"),
+            get_content_name_async("course_settings", "class_island_source_function"),
             get_content_description_async(
-                "time_settings", "class_island_source_function"
+                "course_settings", "class_island_source_function"
             ),
             self.class_island_source_switch,
+        )
+
+
+class pre_class_reset_settings(GroupHeaderCardWidget):
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setTitle(
+            get_content_name_async(
+                "course_settings", "pre_class_reset_settings", "name"
+            )
+        )
+        self.setBorderRadius(8)
+
+        # 课前重置开关
+        self.pre_class_reset_switch = SwitchButton()
+        self.pre_class_reset_switch.setOffText(
+            get_content_name_async("course_settings", "disable")
+        )
+        self.pre_class_reset_switch.setOnText(
+            get_content_name_async("course_settings", "enable")
+        )
+        pre_class_reset_enabled = readme_settings_async(
+            "course_settings", "pre_class_reset_enabled"
+        )
+        self.pre_class_reset_switch.setChecked(pre_class_reset_enabled)
+        self.pre_class_reset_switch.checkedChanged.connect(
+            lambda: update_settings(
+                "course_settings",
+                "pre_class_reset_enabled",
+                self.pre_class_reset_switch.isChecked(),
+            )
+        )
+
+        # 课前重置时间微调框
+        self.pre_class_reset_spinbox = SpinBox()
+        self.pre_class_reset_spinbox.setFixedWidth(WIDTH_SPINBOX)
+        self.pre_class_reset_spinbox.setRange(1, 1440)
+        self.pre_class_reset_spinbox.setSingleStep(1)
+        self.pre_class_reset_spinbox.setSuffix(" s")
+        pre_class_reset_time = readme_settings_async(
+            "course_settings", "pre_class_reset_time"
+        )
+        self.pre_class_reset_spinbox.setValue(pre_class_reset_time)
+        self.pre_class_reset_spinbox.valueChanged.connect(
+            lambda: update_settings(
+                "course_settings",
+                "pre_class_reset_time",
+                self.pre_class_reset_spinbox.value(),
+            )
+        )
+
+        # 添加设置项到分组
+        self.addGroup(
+            get_theme_icon("ic_fluent_timer_20_filled"),
+            get_content_name_async("course_settings", "pre_class_reset_function"),
+            get_content_description_async(
+                "course_settings", "pre_class_reset_function"
+            ),
+            self.pre_class_reset_switch,
+        )
+        self.addGroup(
+            get_theme_icon("ic_fluent_clock_20_filled"),
+            get_content_name_async("course_settings", "pre_class_reset_time"),
+            get_content_description_async("course_settings", "pre_class_reset_time"),
+            self.pre_class_reset_spinbox,
         )
 
 
@@ -137,13 +206,13 @@ class cses_import_settings(GroupHeaderCardWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setTitle(
-            get_content_name_async("time_settings", "cses_import_settings", "name")
+            get_content_name_async("course_settings", "cses_import_settings", "name")
         )
         self.setBorderRadius(8)
 
         # 导入文件按钮
         self.import_file_button = PushButton(
-            get_content_name_async("time_settings", "import_from_file")
+            get_content_name_async("course_settings", "import_from_file")
         )
         self.import_file_button.setIcon(
             get_theme_icon("ic_fluent_folder_open_20_filled")
@@ -152,7 +221,7 @@ class cses_import_settings(GroupHeaderCardWidget):
 
         # 查看当前配置按钮
         self.view_current_config_button = PushButton(
-            get_content_name_async("time_settings", "view_current_config")
+            get_content_name_async("course_settings", "view_current_config")
         )
         self.view_current_config_button.setIcon(
             get_theme_icon("ic_fluent_document_20_filled")
@@ -163,7 +232,7 @@ class cses_import_settings(GroupHeaderCardWidget):
 
         # 当前课程表信息标签
         self.schedule_info_label = BodyLabel(
-            get_content_name_async("time_settings", "no_schedule_imported")
+            get_content_name_async("course_settings", "no_schedule_imported")
         )
         self._update_schedule_info()
 
@@ -185,8 +254,8 @@ class cses_import_settings(GroupHeaderCardWidget):
         # 添加设置项到分组
         self.addGroup(
             get_theme_icon("ic_fluent_calendar_ltr_20_filled"),
-            get_content_name_async("time_settings", "cses_import", "name"),
-            get_content_name_async("time_settings", "cses_import", "description"),
+            get_content_name_async("course_settings", "cses_import", "name"),
+            get_content_name_async("course_settings", "cses_import", "description"),
             info_widget,
         )
 
@@ -219,13 +288,13 @@ class cses_import_settings(GroupHeaderCardWidget):
                 count = total_class_periods
 
                 self.schedule_info_label.setText(
-                    get_content_name_async("time_settings", "schedule_imported").format(
-                        count
-                    )
+                    get_content_name_async(
+                        "course_settings", "schedule_imported"
+                    ).format(count)
                 )
             else:
                 self.schedule_info_label.setText(
-                    get_content_name_async("time_settings", "no_schedule_imported")
+                    get_content_name_async("course_settings", "no_schedule_imported")
                 )
 
         except Exception as e:
@@ -237,9 +306,9 @@ class cses_import_settings(GroupHeaderCardWidget):
         # 打开文件选择对话框
         file_path, _ = QFileDialog.getOpenFileName(
             self,
-            get_content_name_async("time_settings", "select_cses_file"),
+            get_content_name_async("course_settings", "select_cses_file"),
             "",
-            f"{get_content_name_async('time_settings', 'yaml_files')};;{get_content_name_async('time_settings', 'all_files')}",
+            f"{get_content_name_async('course_settings', 'yaml_files')};;{get_content_name_async('course_settings', 'all_files')}",
         )
 
         if file_path:
@@ -251,7 +320,7 @@ class cses_import_settings(GroupHeaderCardWidget):
             # 显示等待对话框
             self.import_file_button.setEnabled(False)
             self.import_file_button.setText(
-                get_content_name_async("time_settings", "importing")
+                get_content_name_async("course_settings", "importing")
             )
 
             # 调用导入函数
@@ -260,7 +329,7 @@ class cses_import_settings(GroupHeaderCardWidget):
             if success:
                 # 显示成功信息
                 InfoBar.success(
-                    title=get_content_name_async("time_settings", "import_success"),
+                    title=get_content_name_async("course_settings", "import_success"),
                     content=message,
                     orient=Qt.Horizontal,
                     isClosable=True,
@@ -275,7 +344,7 @@ class cses_import_settings(GroupHeaderCardWidget):
             else:
                 # 显示错误信息
                 InfoBar.error(
-                    title=get_content_name_async("time_settings", "import_failed"),
+                    title=get_content_name_async("course_settings", "import_failed"),
                     content=message,
                     orient=Qt.Horizontal,
                     isClosable=True,
@@ -286,13 +355,13 @@ class cses_import_settings(GroupHeaderCardWidget):
 
         except Exception as e:
             logger.error(f"导入CSES文件失败: {e}")
-            import_error_msg = get_content_name_async("time_settings", "import_error")
+            import_error_msg = get_content_name_async("course_settings", "import_error")
             if "{}" in import_error_msg:
                 error_content = import_error_msg.format(str(e))
             else:
                 error_content = import_error_msg
             import_failed_title = get_content_name_async(
-                "time_settings", "import_failed"
+                "course_settings", "import_failed"
             )
             # 确保标题不包含意外的格式化占位符
             if "{}" in import_failed_title:
@@ -311,7 +380,7 @@ class cses_import_settings(GroupHeaderCardWidget):
             # 恢复按钮状态
             self.import_file_button.setEnabled(True)
             self.import_file_button.setText(
-                get_content_name_async("time_settings", "import_from_file")
+                get_content_name_async("course_settings", "import_from_file")
             )
 
     def on_view_current_config_clicked(self):
@@ -323,7 +392,7 @@ class cses_import_settings(GroupHeaderCardWidget):
         except Exception as e:
             logger.error(f"显示当前配置失败: {e}")
             InfoBar.error(
-                title=get_content_name_async("time_settings", "import_failed"),
+                title=get_content_name_async("course_settings", "import_failed"),
                 content=f"无法显示当前配置: {str(e)}",
                 orient=Qt.Horizontal,
                 isClosable=True,

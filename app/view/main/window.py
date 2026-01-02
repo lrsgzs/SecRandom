@@ -74,6 +74,9 @@ class MainWindow(FluentWindow):
             lambda: self.save_window_size(self.width(), self.height())
         )
 
+        # 课前重置相关变量
+        self.pre_class_reset_performed = False
+
         # 设置窗口属性
         self.setMinimumSize(MINIMUM_WINDOW_SIZE[0], MINIMUM_WINDOW_SIZE[1])
         self.setWindowTitle("SecRandom")
@@ -841,7 +844,7 @@ class MainWindow(FluentWindow):
 
             # 检查是否启用了ClassIsland数据源
             use_class_island_source = readme_settings_async(
-                "time_settings", "class_island_source_enabled", False
+                "course_settings", "class_island_source_enabled", False
             )
 
             if (
@@ -858,6 +861,11 @@ class MainWindow(FluentWindow):
                 # 更新全局状态以反映当前是否为课间时间
                 # 注意：这将影响到整个应用的课间禁用行为
                 self._update_class_island_break_status(is_break_time, current_state)
+
+                # 检查是否需要执行课前重置
+                self._handle_pre_class_reset(
+                    is_break_time, on_class_left_time, on_breaking_time_left_time
+                )
 
             # 这里可以添加根据ClassIsland数据更新UI的逻辑
             # 例如：显示当前课程信息、更新课程表显示等
@@ -941,8 +949,108 @@ class MainWindow(FluentWindow):
             from app.tools.settings_access import update_settings
 
             update_settings(
-                "time_settings", "current_class_island_break_status", is_break_time
+                "course_settings", "current_class_island_break_status", is_break_time
             )
-            update_settings("time_settings", "last_class_island_state", current_state)
+            update_settings("course_settings", "last_class_island_state", current_state)
         except Exception as e:
             logger.error(f"更新ClassIsland课间状态失败: {e}")
+
+    def _handle_pre_class_reset(
+        self,
+        is_break_time: bool,
+        on_class_left_time: int,
+        on_breaking_time_left_time: int,
+    ):
+        """处理课前重置逻辑
+
+        Args:
+            is_break_time: 是否为课间时间
+            on_class_left_time: 距离上课剩余时间（秒）
+            on_breaking_time_left_time: 距下课剩余时间（秒）
+        """
+        try:
+            # 检查是否启用了课前重置功能
+            pre_class_reset_enabled = readme_settings_async(
+                "course_settings", "pre_class_reset_enabled", False
+            )
+            if not pre_class_reset_enabled:
+                return
+
+            # 获取课前重置时间（秒）
+            pre_class_reset_time = readme_settings_async(
+                "course_settings", "pre_class_reset_time", 60
+            )
+
+            # 如果当前是课间时间，重置标记
+            if is_break_time:
+                self.pre_class_reset_performed = False
+                return
+
+            # 如果已经执行过重置，不再重复执行
+            if self.pre_class_reset_performed:
+                return
+
+            # 检查是否在上课前指定时间范围内
+            # on_class_left_time 是距离上课的剩余时间（秒）
+            if (
+                on_class_left_time is not None
+                and on_class_left_time <= pre_class_reset_time
+            ):
+                logger.info(f"距离上课还有 {on_class_left_time} 秒，执行课前重置")
+                self._perform_pre_class_reset()
+                self.pre_class_reset_performed = True
+
+        except Exception as e:
+            logger.error(f"处理课前重置时出错: {e}")
+
+    def _perform_pre_class_reset(self):
+        """执行课前重置操作"""
+        try:
+            # 清除点名页面的临时记录和结果
+            if self.roll_call_page and hasattr(self.roll_call_page, "clear_result"):
+                self.roll_call_page.clear_result()
+                logger.info("已清除点名页面结果")
+
+            # 清除抽奖页面的临时记录和结果
+            if self.lottery_page and hasattr(self.lottery_page, "clear_result"):
+                self.lottery_page.clear_result()
+                logger.info("已清除抽奖页面结果")
+
+            # 清除临时记录文件
+            from app.tools.config import reset_drawn_record
+
+            # 清除所有班级的临时记录
+            from app.tools.path_utils import get_data_path
+            import os
+
+            list_dir = get_data_path("list/roll_call_list")
+            if os.path.exists(list_dir):
+                for file_name in os.listdir(list_dir):
+                    if file_name.endswith(".json"):
+                        class_name = file_name[:-5]  # 移除.json后缀
+                        try:
+                            reset_drawn_record(
+                                None, class_name, None, None
+                            )  # 清除临时记录
+                            logger.info(f"已清除班级 {class_name} 的临时记录")
+                        except Exception as e:
+                            logger.error(f"清除班级 {class_name} 的临时记录失败: {e}")
+
+            # 清除奖池的临时记录
+            pool_dir = get_data_path("list/lottery_list")
+            if os.path.exists(pool_dir):
+                for file_name in os.listdir(pool_dir):
+                    if file_name.endswith(".json"):
+                        pool_name = file_name[:-5]  # 移除.json后缀
+                        try:
+                            reset_drawn_record(
+                                None, pool_name, None, None
+                            )  # 清除临时记录
+                            logger.info(f"已清除奖池 {pool_name} 的临时记录")
+                        except Exception as e:
+                            logger.error(f"清除奖池 {pool_name} 的临时记录失败: {e}")
+
+            logger.info("课前重置完成")
+
+        except Exception as e:
+            logger.error(f"执行课前重置时出错: {e}")

@@ -13,10 +13,10 @@ settings = {
     "EN_US": {"title": {"name": "Settings", "description": "Settings window"}},
 }
 
-# 时间设置语言配置
-time_settings = {
+# 课程相关语言配置
+course_settings = {
     "ZH_CN": {
-        "title": {"name": "时间设置", "description": "设置课间禁用和课程表导入"},
+        "title": {"name": "课程相关", "description": "设置课间禁用和课程表导入"},
         "class_break_settings": {
             "name": "课间禁用设置",
             "description": "设置课间禁用功能",
@@ -40,6 +40,18 @@ time_settings = {
         "class_island_source_function": {
             "name": "ClassIsland数据源",
             "description": "启用后，使用ClassIsland软件提供的课程表信息判断课间时间",
+        },
+        "pre_class_reset_settings": {
+            "name": "课前重置设置",
+            "description": "设置课前重置临时记录功能",
+        },
+        "pre_class_reset_function": {
+            "name": "课前重置功能",
+            "description": "启用后，在上课前指定秒数内自动清除临时记录和界面结果",
+        },
+        "pre_class_reset_time": {
+            "name": "课前重置时间",
+            "description": "在上课前多少秒清除临时记录和界面结果（1-1440秒）",
         },
         "import_from_file": {"name": "从文件导入"},
         "importing": {"name": "导入中..."},
@@ -85,7 +97,7 @@ time_settings = {
         },
     },
     "EN_US": {
-        "title": {"name": "时间设置", "description": "设置课间禁用和课程表导入"},
+        "title": {"name": "Course Related", "description": "设置课间禁用和课程表导入"},
         "class_break_settings": {
             "name": "课间禁用设置",
             "description": "设置课间禁用功能",
@@ -127,6 +139,18 @@ time_settings = {
         "class_island_source_function": {
             "name": "ClassIsland data source",
             "description": "When enabled, use ClassIsland software's schedule information to determine class break times",
+        },
+        "pre_class_reset_settings": {
+            "name": "Pre-class reset settings",
+            "description": "Settings for pre-class reset of temporary records",
+        },
+        "pre_class_reset_function": {
+            "name": "Pre-class reset function",
+            "description": "When enabled, automatically clear temporary records and interface results within specified seconds before class",
+        },
+        "pre_class_reset_time": {
+            "name": "Pre-class reset time",
+            "description": "How many seconds before class to clear temporary records and interface results (1-1440 seconds)",
         },
         "view_current_config": {"name": "查看当前配置"},
         "schedule_imported": {"name": "已导入 {} 个上课时间段"},
@@ -268,6 +292,63 @@ about = {
         },
         "copyright": {"name": "Copyright", "description": "SecRandom follows GPL-3.0"},
         "version": {"name": "Version", "description": "Show current version"},
+    },
+}
+
+# 内幕设置语言配置
+behind_scenes_settings = {
+    "ZH_CN": {
+        "title": {"name": "内幕设置", "description": "设置特定人员的抽取概率"},
+        "select_mode": {"name": "选择模式", "description": "选择点名或抽奖模式"},
+        "mode_options": {"combo_items": ["点名", "抽奖"]},
+        "select_list": {"name": "选择名单", "description": "选择要设置概率的名单"},
+        "select_class_name": {
+            "name": "选择班级",
+            "description": "选择要设置概率的班级",
+        },
+        "select_pool_name": {"name": "选择奖池", "description": "选择要设置概率的奖池"},
+        "enabled": {"name": "启用", "description": "是否启用该人员的概率设置"},
+        "id": {"name": "学号", "description": "学生学号"},
+        "name": {"name": "姓名", "description": "学生姓名"},
+        "prize": {"name": "奖品", "description": "关联的奖品（抽奖模式）"},
+        "probability": {
+            "name": "权重",
+            "description": "抽取权重（0=禁用，1.0=正常，≥1000=必中）",
+        },
+    },
+    "EN_US": {
+        "title": {
+            "name": "Behind the Scenes Settings",
+            "description": "Set draw probability for specific persons",
+        },
+        "select_mode": {
+            "name": "Select Mode",
+            "description": "Select roll call or lottery mode",
+        },
+        "mode_options": {"combo_items": ["Roll Call", "Lottery"]},
+        "select_list": {
+            "name": "Select List",
+            "description": "Select list to set probability",
+        },
+        "select_class_name": {
+            "name": "Select Class",
+            "description": "Select the class to set probability",
+        },
+        "select_pool_name": {
+            "name": "Select Pool",
+            "description": "Select to pool set probability",
+        },
+        "enabled": {
+            "name": "Enabled",
+            "description": "Whether to enable probability settings for this person",
+        },
+        "id": {"name": "ID", "description": "Student ID"},
+        "name": {"name": "Name", "description": "Student name"},
+        "prize": {"name": "Prize", "description": "Associated prize (lottery mode)"},
+        "probability": {
+            "name": "Weight",
+            "description": "Draw weight (0=Disabled, 1.0=Normal, ≥1000=Guaranteed)",
+        },
     },
 }
 

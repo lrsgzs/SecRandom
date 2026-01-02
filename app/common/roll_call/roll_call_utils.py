@@ -7,6 +7,7 @@ from random import SystemRandom
 from app.common.data.list import get_group_list, get_student_list, filter_students_data
 from app.common.history.history import calculate_weight
 from app.common.fair_draw.avg_gap_protection import apply_avg_gap_protection
+from app.common.behind_scenes.behind_scenes_utils import BehindScenesUtils
 from app.tools.config import (
     calculate_remaining_count,
     read_drawn_record,
@@ -205,15 +206,53 @@ class RollCallUtils:
             students_dict_list, current_count, class_name, "roll_call"
         )
 
+        # 应用内幕设置
+        students_dict_list, behind_scenes_weights = (
+            BehindScenesUtils.apply_probability_weights(
+                students_dict_list, 0, class_name
+            )
+        )
+
+        # 检查是否有必中人员
+        guaranteed_students = BehindScenesUtils.ensure_guaranteed_selection(
+            students_dict_list, behind_scenes_weights, class_name
+        )
+        if guaranteed_students is not None:
+            # 存在必中人员，直接返回
+            selected_students = []
+            selected_students_dict = []
+            for student in guaranteed_students:
+                selected_students.append(
+                    (
+                        student.get("id", ""),
+                        student.get("name", ""),
+                        student.get("exist", True),
+                    )
+                )
+                selected_students_dict.append(student)
+
+            return {
+                "selected_students": selected_students,
+                "class_name": class_name,
+                "selected_students_dict": selected_students_dict,
+                "group_filter": group_filter,
+                "gender_filter": gender_filter,
+            }
+
         draw_type = readme_settings_async("roll_call_settings", "draw_type")
         if draw_type == 1:
             students_with_weight = calculate_weight(students_dict_list, class_name)
             weights = []
-            for student in students_with_weight:
-                weights.append(student.get("weight", 1.0))
+            for i, student in enumerate(students_with_weight):
+                # 结合内幕权重和历史权重
+                base_weight = student.get("weight", 1.0)
+                behind_scenes_weight = (
+                    behind_scenes_weights[i] if i < len(behind_scenes_weights) else 1.0
+                )
+                weights.append(base_weight * behind_scenes_weight)
         else:
             students_with_weight = students_dict_list
-            weights = [1.0] * len(students_dict_list)
+            weights = behind_scenes_weights
 
         draw_count = current_count
         draw_count = min(draw_count, len(students_with_weight))

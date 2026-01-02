@@ -334,9 +334,6 @@ class quick_draw_extraction_function(GroupHeaderCardWidget):
             # 恢复信号
             self.clear_record_combo.blockSignals(False)
 
-            # 更新设置
-            update_settings("quick_draw_settings", "clear_record", 0)
-
             # 根据具体模式设置half_repeat_spin
             if draw_mode_index == 1:  # 不重复抽取模式
                 # 设置half_repeat_spin为1并禁用

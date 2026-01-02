@@ -27,14 +27,14 @@ def _is_non_class_time() -> bool:
     """
     try:
         instant_draw_disable = readme_settings_async(
-            "time_settings", "instant_draw_disable"
+            "course_settings", "instant_draw_disable"
         )
         logger.debug(f"课间禁用开关是否启用: {instant_draw_disable}")
         if not instant_draw_disable:
             return False
 
         use_class_island_source = readme_settings_async(
-            "time_settings", "class_island_source_enabled"
+            "course_settings", "class_island_source_enabled"
         )
         logger.debug(f"是否启用了ClassIsland数据源: {use_class_island_source}")
         if use_class_island_source:
@@ -252,13 +252,13 @@ def import_cses_schedule(file_path: str) -> Tuple[bool, str]:
 
         if not parser.load_from_file(file_path):
             return False, get_content_name_async(
-                "time_settings", "cses_file_format_error"
+                "course_settings", "cses_file_format_error"
             )
 
         non_class_times = parser.get_non_class_times()
         if not non_class_times:
             return False, get_content_name_async(
-                "time_settings", "no_valid_time_periods"
+                "course_settings", "no_valid_time_periods"
             )
 
         original_file_name = Path(file_path).name
@@ -270,7 +270,7 @@ def import_cses_schedule(file_path: str) -> Tuple[bool, str]:
         logger.info(f"已将CSES文件保存到: {cses_data_path}")
 
         summary = parser.get_summary()
-        import_success_msg = get_content_name_async("time_settings", "import_success")
+        import_success_msg = get_content_name_async("course_settings", "import_success")
         if "{}" in import_success_msg:
             return True, import_success_msg.format(summary)
         else:
@@ -278,7 +278,7 @@ def import_cses_schedule(file_path: str) -> Tuple[bool, str]:
 
     except Exception as e:
         logger.error(f"导入CSES文件失败: {e}")
-        return False, get_content_name_async("time_settings", "import_failed").format(
+        return False, get_content_name_async("course_settings", "import_failed").format(
             str(e)
         )
 
@@ -297,23 +297,23 @@ def import_cses_schedule_from_content(content: str) -> Tuple[bool, str]:
 
         if not parser.load_from_content(content):
             return False, get_content_name_async(
-                "time_settings", "cses_content_format_error"
+                "course_settings", "cses_content_format_error"
             )
 
         non_class_times = parser.get_non_class_times()
         if not non_class_times:
             return False, get_content_name_async(
-                "time_settings", "no_valid_time_periods"
+                "course_settings", "no_valid_time_periods"
             )
 
         summary = parser.get_summary()
-        return True, get_content_name_async("time_settings", "import_success").format(
+        return True, get_content_name_async("course_settings", "import_success").format(
             summary
         )
 
     except Exception as e:
         logger.error(f"导入CSES内容失败: {e}")
-        return False, get_content_name_async("time_settings", "import_failed").format(
+        return False, get_content_name_async("course_settings", "import_failed").format(
             str(e)
         )
 

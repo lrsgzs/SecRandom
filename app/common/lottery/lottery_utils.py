@@ -12,6 +12,7 @@ from app.common.data.list import (
 )
 from app.common.roll_call.roll_call_utils import RollCallUtils
 from app.common.history.history import calculate_weight
+from app.common.behind_scenes.behind_scenes_utils import BehindScenesUtils
 from app.tools.config import (
     calculate_remaining_count,
     read_drawn_record,
@@ -121,6 +122,8 @@ class LotteryUtils:
         gender_filter,
         current_count,
         half_repeat,
+        pool_name=None,
+        prize_list=None,
     ):
         """
         抽取随机学生
@@ -133,6 +136,8 @@ class LotteryUtils:
             gender_filter: 性别过滤器
             current_count: 当前抽取数量
             half_repeat: 半重复设置
+            pool_name: 奖池名称（用于抽奖模式下应用内幕设置）
+            prize_list: 奖品列表（用于提高指定该奖品的学生的权重）
 
         Returns:
             dict: 包含抽取结果的字典
@@ -215,6 +220,43 @@ class LotteryUtils:
         else:
             students_with_weight = students_dict_list
             weights = [1.0] * len(students_dict_list)
+
+        # 应用内幕设置（抽奖模式下按奖池应用权重）
+        if pool_name:
+            students_with_weight, behind_scenes_weights = (
+                BehindScenesUtils.apply_probability_weights(
+                    students_with_weight, 1, class_name, pool_name, prize_list
+                )
+            )
+
+            # 检查是否有必中人员
+            guaranteed_students = BehindScenesUtils.ensure_guaranteed_selection(
+                students_with_weight, behind_scenes_weights, class_name, pool_name
+            )
+            if guaranteed_students is not None:
+                # 存在必中人员，直接返回
+                selected_students = []
+                selected_students_dict = []
+                for student in guaranteed_students:
+                    selected_students.append(
+                        (
+                            student.get("id"),
+                            student.get("name"),
+                            student.get("exist", True),
+                        )
+                    )
+                    selected_students_dict.append(student)
+
+                return {
+                    "selected_students": selected_students,
+                    "class_name": class_name,
+                    "selected_students_dict": selected_students_dict,
+                    "group_filter": group_filter,
+                    "gender_filter": gender_filter,
+                }
+
+            # 使用内幕设置的权重
+            weights = behind_scenes_weights
 
         draw_count = current_count
         draw_count = min(draw_count, len(students_with_weight))
@@ -304,8 +346,41 @@ class LotteryUtils:
                 items = available
                 if not items:
                     return {"reset_required": True}
+
+            # 应用内幕设置
+            items, behind_scenes_weights = (
+                BehindScenesUtils.apply_probability_weights_to_items(
+                    items, 1, pool_name
+                )
+            )
+
+            # 检查是否有必中奖品
+            guaranteed_items = BehindScenesUtils.ensure_guaranteed_selection(
+                items, behind_scenes_weights, pool_name
+            )
+            if guaranteed_items is not None:
+                # 存在必中奖品，直接返回
+                selected = []
+                selected_dict = []
+                for item in guaranteed_items:
+                    selected.append(
+                        (item.get("id"), item.get("name"), item.get("exist", True))
+                    )
+                    selected_dict.append(item)
+
+                return {
+                    "selected_prizes": selected,
+                    "pool_name": pool_name,
+                    "selected_prizes_dict": selected_dict,
+                }
+
             # 准备权重
-            weights = [float(i.get("weight", 1)) for i in items]
+            weights = []
+            for i, item in enumerate(items):
+                base_weight = float(item.get("weight", 1))
+                behind_scenes_weight = behind_scenes_weights[i]
+                weights.append(base_weight * behind_scenes_weight)
+
             draw = min(current_count, len(items))
             selected = []
             selected_dict = []

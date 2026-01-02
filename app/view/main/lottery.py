@@ -630,7 +630,7 @@ class Lottery(QWidget):
         # 检查当前时间是否在非上课时间段内
         if _is_non_class_time():
             # 检查是否需要验证流程
-            if readme_settings_async("time_settings", "verification_required"):
+            if readme_settings_async("course_settings", "verification_required"):
                 # 如果需要验证流程，弹出密码验证窗口
                 logger.info("当前时间在非上课时间段内，需要密码验证")
                 require_and_run("lottery_start", self, self._do_start_draw)
@@ -817,7 +817,7 @@ class Lottery(QWidget):
         self.final_group_filter = group_filter
         self.final_gender_filter = gender_filter
 
-        # 根据“跟随学生”模式拼接显示
+        # 根据"跟随学生"模式拼接显示
         try:
             list_base_options = get_content_combo_name_async("lottery", "list_combobox")
         except Exception:
@@ -825,6 +825,9 @@ class Lottery(QWidget):
         selected_text = self.list_combobox.currentText()
         if list_base_options and selected_text not in list_base_options:
             try:
+                # 获取抽中的奖品列表
+                prize_names = [item[1] for item in (self.final_selected_students or [])]
+
                 # 抽取与奖品数量相同的学生（不重复规则由学生设置决定，此处不启用半重复）
                 student_result = LotteryUtils.draw_random_students(
                     selected_text,
@@ -834,6 +837,8 @@ class Lottery(QWidget):
                     "",
                     len(self.final_selected_students or []),
                     0,
+                    pool_name,  # 传入奖池名称，用于应用内幕设置
+                    prize_names,  # 传入奖品列表，用于提高指定该奖品的学生的权重
                 )
                 student_names = [
                     s[1] for s in (student_result.get("selected_students") or [])
@@ -936,7 +941,7 @@ class Lottery(QWidget):
         # 检查当前时间是否在非上课时间段内
         if _is_non_class_time():
             # 检查是否需要验证流程
-            if readme_settings_async("time_settings", "verification_required"):
+            if readme_settings_async("course_settings", "verification_required"):
                 # 如果需要验证流程，弹出密码验证窗口
                 logger.info("当前时间在非上课时间段内，需要密码验证")
                 require_and_run("lottery_reset", self, self._do_reset_count)

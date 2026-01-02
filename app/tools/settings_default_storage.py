@@ -430,13 +430,15 @@ DEFAULT_SETTINGS = {
     "more_settings": {
         "title": {"default_value": None},
     },
-    "time_settings": {
+    "course_settings": {
         "title": {"default_value": None},
         "verification_required": {"default_value": True},
         "instant_draw_disable": {"default_value": False},
         "class_island_source_enabled": {"default_value": False},
         "current_class_island_break_status": {"default_value": False},
         "last_class_island_state": {"default_value": ""},
+        "pre_class_reset_enabled": {"default_value": True},
+        "pre_class_reset_time": {"default_value": 120},
     },
     "fair_draw_settings": {
         "title": {"default_value": None},
@@ -481,6 +483,9 @@ DEFAULT_SETTINGS = {
         "decrease_lottery_count": {"default_value": ""},
         "start_roll_call": {"default_value": ""},
         "start_lottery": {"default_value": ""},
+    },
+    "behind_scenes_settings": {
+        "title": {"default_value": None},
     },
     "about": {
         "title": {"default_value": None},

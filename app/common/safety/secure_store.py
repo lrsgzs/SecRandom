@@ -174,12 +174,95 @@ def write_secrets(d: dict) -> None:
                 logger.warning(f"写入安全配置降级为明文JSON：{p}")
             except Exception as e2:
                 logger.error(f"降级写入明文JSON也失败：{e2}")
+
+
+def read_behind_scenes_settings() -> dict:
+    """读取内幕设置数据
+
+    Returns:
+        dict: 内幕设置数据字典
+    """
+    p = get_settings_path("behind_scenes.json")
+    if not os.path.exists(p):
+        ensure_dir(os.path.dirname(p))
+        with open(p, "wb") as f:
+            f.write(b"")
+        _set_hidden(str(p))
+        logger.debug(f"创建空内幕设置文件：{p}")
+        return {}
+    if os.path.exists(p):
+        try:
+            with open(p, "rb") as f:
+                blob = f.read()
+            if blob[:4] == b"SRV1":
+                payload = blob[4:]
+                key = _platform_key()
+                data = _decrypt_payload(payload, key)
+                dec = zlib.decompress(data)
+                out = json.loads(dec.decode("utf-8"))
+                logger.debug("读取内幕设置成功（SRV1）")
+                return out
+            with open(p, "r", encoding="utf-8") as f:
+                out = json.load(f)
+                logger.debug("读取内幕设置成功（JSON）")
+                return out
+        except Exception:
+            try:
+                with open(p, "r", encoding="utf-8") as f:
+                    out = json.load(f)
+                    logger.debug("读取内幕设置成功（兼容JSON）")
+                    return out
+            except Exception:
+                logger.warning("读取内幕设置失败，返回空配置")
+    return {}
+
+
+def write_behind_scenes_settings(d: dict) -> None:
+    """写入内幕设置数据
+
+    Args:
+        d: 要写入的数据字典
+    """
+    p = get_settings_path("behind_scenes.json")
+    ensure_dir(os.path.dirname(p))
+    try:
+        raw = json.dumps(d, ensure_ascii=False, indent=4).encode("utf-8")
+        comp = zlib.compress(raw, level=6)
+        key = _platform_key()
+        payload = _encrypt_payload(comp, key)
+        with open(p, "wb") as f:
+            f.write(b"SRV1" + payload)
+        _set_hidden(str(p))
+        logger.debug(f"写入内幕设置成功：{p}")
+    except PermissionError as e:
+        logger.error(
+            f"写入内幕设置失败：权限被拒绝，文件可能被占用或无写权限：{p}, 错误：{e}"
+        )
+        try:
+            import tempfile
+
+            with tempfile.NamedTemporaryFile(
+                mode="wb", delete=False, dir=os.path.dirname(p)
+            ) as tmp_file:
+                tmp_file.write(b"SRV1" + payload)
+                tmp_path = tmp_file.name
+
+            os.replace(tmp_path, p)
+            _set_hidden(str(p))
+            logger.debug(f"使用临时文件写入内幕设置成功：{p}")
+        except Exception as temp_e:
+            logger.error(f"使用临时文件写入内幕设置也失败：{temp_e}")
+            try:
+                with open(p, "w", encoding="utf-8") as f:
+                    json.dump(d, f, ensure_ascii=False, indent=4)
+                logger.warning(f"写入内幕设置降级为明文JSON：{p}")
+            except Exception as e2:
+                logger.error(f"降级写入明文JSON也失败：{e2}")
     except Exception as e:
-        logger.error(f"写入安全配置失败：{p}, 错误：{e}")
-        # 降级到明文JSON写入
+        logger.error(f"写入内幕设置失败：{p}, 错误：{e}")
         try:
             with open(p, "w", encoding="utf-8") as f:
                 json.dump(d, f, ensure_ascii=False, indent=4)
-            logger.warning(f"写入安全配置降级为明文JSON：{p}")
+            logger.warning(f"写入内幕设置降级为明文JSON：{p}")
         except Exception as e2:
             logger.error(f"降级写入明文JSON也失败：{e2}")

@@ -144,26 +144,48 @@ class more_settings_page(PivotPageTemplate):
     """创建更多设置页面"""
 
     def __init__(self, parent: QFrame = None, is_preview=False):
+        from app.common.safety.secure_store import read_behind_scenes_settings
+
+        # 读取横幅点击次数
+        click_count = 0
+        try:
+            data = read_behind_scenes_settings()
+            click_count = data.get("banner_click_count", 0)
+        except Exception:
+            pass
+
+        # 只有点击次数 >= 10 时才显示内幕设置页面
+        show_behind_scenes = click_count >= 10
+
         if readme_settings_async("basic_settings", "simplified_mode"):
-            page_config = {
-                "time_settings": get_content_name_async("time_settings", "title"),
-                "shortcut_settings": get_content_name_async(
-                    "shortcut_settings", "title"
-                ),
-            }
+            page_config = {}
+            if show_behind_scenes:
+                page_config["behind_scenes_settings"] = get_content_name_async(
+                    "behind_scenes_settings", "title"
+                )
+            page_config["course_settings"] = get_content_name_async(
+                "course_settings", "title"
+            )
+            page_config["shortcut_settings"] = get_content_name_async(
+                "shortcut_settings", "title"
+            )
         else:
             page_config = {
                 "fair_draw": get_content_name_async("fair_draw_settings", "title"),
                 "shortcut_settings": get_content_name_async(
                     "shortcut_settings", "title"
                 ),
-                "time_settings": get_content_name_async("time_settings", "title"),
+                "course_settings": get_content_name_async("course_settings", "title"),
                 "music_settings": get_content_name_async("music_settings", "title"),
                 "page_management": get_content_name_async("page_management", "title"),
                 "sidebar_tray_management": get_content_name_async(
                     "sidebar_tray_management", "title"
                 ),
             }
+            if show_behind_scenes:
+                page_config["behind_scenes_settings"] = get_content_name_async(
+                    "behind_scenes_settings", "title"
+                )
         super().__init__(page_config, parent, is_preview_mode=is_preview)
         self.set_base_path("app.view.settings.more_settings")
 

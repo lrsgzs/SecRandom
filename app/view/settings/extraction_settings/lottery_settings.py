@@ -55,6 +55,7 @@ class lottery_extraction_function(GroupHeaderCardWidget):
         self.draw_mode_combo = ComboBox()
         self.draw_mode_combo.currentIndexChanged.connect(self.on_draw_mode_changed)
 
+        # 清除记录下拉框
         self.clear_record_combo = ComboBox()
         self.clear_record_combo.currentIndexChanged.connect(
             lambda: update_settings(
@@ -306,9 +307,6 @@ class lottery_extraction_function(GroupHeaderCardWidget):
 
             # 恢复信号
             self.clear_record_combo.blockSignals(False)
-
-            # 更新设置
-            update_settings("lottery_settings", "clear_record", 0)
 
             # 根据具体模式设置half_repeat_spin
             if draw_mode_index == 1:  # 不重复抽取模式

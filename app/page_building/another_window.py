@@ -555,7 +555,7 @@ def create_current_config_viewer_window():
     Returns:
         创建的窗口实例
     """
-    title = get_content_name_async("time_settings", "cses_import_settings", "name")
+    title = get_content_name_async("course_settings", "cses_import_settings", "name")
     window = SimpleWindowTemplate(title, width=800, height=600)
     window.add_page_from_template(
         "current_config_viewer", current_config_viewer_window_template

@@ -8,6 +8,7 @@ from PySide6.QtCore import *
 from PySide6.QtNetwork import *
 from qfluentwidgets import *
 from qfluentwidgets import FluentIcon as FIF
+from loguru import logger
 
 from app.tools.variable import *
 from app.tools.path_utils import *
@@ -15,6 +16,10 @@ from app.tools.personalised import *
 from app.tools.settings_default import *
 from app.tools.settings_access import *
 from app.Language.obtain_language import *
+from app.common.safety.secure_store import (
+    read_behind_scenes_settings,
+    write_behind_scenes_settings,
+)
 
 from app.page_building.another_window import create_contributor_window
 
@@ -51,6 +56,9 @@ class about_banner(QWidget):
         self.banner_image.setBorderRadius(12, 12, 12, 12)
         self.banner_image.setScaledContents(True)
 
+        # 加载点击次数
+        self.click_count = self._load_click_count()
+
         # 添加横幅图片到布局
         self.vBoxLayout = QHBoxLayout(self)
         self.vBoxLayout.setContentsMargins(0, 0, 0, 0)
@@ -58,6 +66,32 @@ class about_banner(QWidget):
 
         # 使图片居中
         self.vBoxLayout.addWidget(self.banner_image, 0, Qt.AlignmentFlag.AlignCenter)
+
+        # 连接点击事件
+        self.banner_image.mousePressEvent = self._on_banner_clicked
+
+    def _load_click_count(self):
+        """加载横幅点击次数"""
+        try:
+            data = read_behind_scenes_settings()
+            return data.get("banner_click_count", 0)
+        except Exception as e:
+            logger.error(f"加载横幅点击次数失败: {e}")
+            return 0
+
+    def _save_click_count(self, count):
+        """保存横幅点击次数"""
+        try:
+            data = read_behind_scenes_settings()
+            data["banner_click_count"] = count
+            write_behind_scenes_settings(data)
+        except Exception as e:
+            logger.error(f"保存横幅点击次数失败: {e}")
+
+    def _on_banner_clicked(self, event):
+        """横幅点击事件"""
+        self.click_count += 1
+        self._save_click_count(self.click_count)
 
 
 # ==================================================

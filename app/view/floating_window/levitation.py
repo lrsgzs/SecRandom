@@ -553,7 +553,7 @@ class LevitationWindow(QWidget):
             if is_non_class_time:
                 # 检查是否需要验证流程
                 verification_required = readme_settings_async(
-                    "time_settings", "verification_required"
+                    "course_settings", "verification_required"
                 )
                 if verification_required:
                     # 如果需要验证流程，弹出密码验证窗口
