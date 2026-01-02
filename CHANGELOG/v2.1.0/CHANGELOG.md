@@ -1,4 +1,4 @@
-![SecRandom 新版本](../../data/assets/icon/secrandom-version.png)
+<img width="1800" height="766" alt="新版本" src="https://github.com/SECTL/SecRandom/blob/master/data/assets/icon/secrandom-version.png" />
 v2.0 - Koharu（小鸟游星野） release 2
 
 ## 🚀 主要更新
