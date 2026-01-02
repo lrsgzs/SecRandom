@@ -8,12 +8,13 @@ from app.tools.update_utils import check_for_updates_on_startup
 from app.tools.variable import APP_INIT_DELAY
 from app.core.font_manager import apply_font_settings
 from app.core.window_manager import WindowManager
+from app.core.utils import safe_execute
 
 
 class AppInitializer:
     """应用程序初始化器，负责协调所有初始化任务"""
 
-    def __init__(self, window_manager: WindowManager):
+    def __init__(self, window_manager: WindowManager) -> None:
         """初始化应用初始化器
 
         Args:
@@ -21,17 +22,17 @@ class AppInitializer:
         """
         self.window_manager = window_manager
 
-    def initialize(self):
+    def initialize(self) -> None:
         """初始化应用程序"""
         self._manage_settings_file()
         self._schedule_initialization_tasks()
         logger.debug("应用初始化调度已启动，主窗口将在延迟后创建")
 
-    def _manage_settings_file(self):
+    def _manage_settings_file(self) -> None:
         """管理设置文件，确保其存在且完整"""
         manage_settings_file()
 
-    def _schedule_initialization_tasks(self):
+    def _schedule_initialization_tasks(self) -> None:
         """调度所有初始化任务"""
         self._load_theme()
         self._load_theme_color()
@@ -40,48 +41,70 @@ class AppInitializer:
         self._create_main_window()
         self._apply_font_settings()
 
-    def _load_theme(self):
+    def _load_theme(self) -> None:
         """加载主题设置"""
-        from qfluentwidgets import setTheme, Theme
-
         QTimer.singleShot(
             APP_INIT_DELAY,
-            lambda: (
-                setTheme(Theme.DARK)
-                if readme_settings_async("basic_settings", "theme") == "DARK"
-                else (
-                    setTheme(Theme.AUTO)
-                    if readme_settings_async("basic_settings", "theme") == "AUTO"
-                    else setTheme(Theme.LIGHT)
-                )
-            ),
+            lambda: safe_execute(self._apply_theme, error_message="加载主题失败"),
         )
 
-    def _load_theme_color(self):
+    def _apply_theme(self) -> None:
+        """应用主题设置"""
+        from qfluentwidgets import setTheme, Theme
+
+        theme = readme_settings_async("basic_settings", "theme")
+        if theme == "DARK":
+            setTheme(Theme.DARK)
+        elif theme == "AUTO":
+            setTheme(Theme.AUTO)
+        else:
+            setTheme(Theme.LIGHT)
+
+    def _load_theme_color(self) -> None:
         """加载主题颜色"""
         from qfluentwidgets import setThemeColor
 
         QTimer.singleShot(
             APP_INIT_DELAY,
-            lambda: setThemeColor(
-                readme_settings_async("basic_settings", "theme_color")
+            lambda: safe_execute(
+                lambda: setThemeColor(
+                    readme_settings_async("basic_settings", "theme_color")
+                ),
+                error_message="加载主题颜色失败",
             ),
         )
 
-    def _clear_restart_record(self):
+    def _clear_restart_record(self) -> None:
         """清除重启记录"""
-        QTimer.singleShot(APP_INIT_DELAY, lambda: remove_record("", "", "", "restart"))
-
-    def _check_updates(self):
-        """检查是否需要安装更新"""
-        QTimer.singleShot(APP_INIT_DELAY, lambda: check_for_updates_on_startup(None))
-
-    def _create_main_window(self):
-        """创建主窗口实例（但不自动显示）"""
         QTimer.singleShot(
-            APP_INIT_DELAY, lambda: self.window_manager.create_main_window()
+            APP_INIT_DELAY,
+            lambda: safe_execute(
+                lambda: remove_record("", "", "", "restart"),
+                error_message="清除重启记录失败",
+            ),
         )
 
-    def _apply_font_settings(self):
+    def _check_updates(self) -> None:
+        """检查是否需要安装更新"""
+        QTimer.singleShot(
+            APP_INIT_DELAY,
+            lambda: safe_execute(
+                lambda: check_for_updates_on_startup(None), error_message="检查更新失败"
+            ),
+        )
+
+    def _create_main_window(self) -> None:
+        """创建主窗口实例（但不自动显示）"""
+        QTimer.singleShot(
+            APP_INIT_DELAY,
+            lambda: safe_execute(
+                self.window_manager.create_main_window, error_message="创建主窗口失败"
+            ),
+        )
+
+    def _apply_font_settings(self) -> None:
         """应用字体设置"""
-        QTimer.singleShot(APP_INIT_DELAY, lambda: apply_font_settings())
+        QTimer.singleShot(
+            APP_INIT_DELAY,
+            lambda: safe_execute(apply_font_settings, error_message="应用字体设置失败"),
+        )
