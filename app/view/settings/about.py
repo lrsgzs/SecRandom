@@ -47,7 +47,7 @@ class about_banner(QWidget):
         super().__init__(parent)
         banner_path = get_data_path("assets/icon", "secrandom-banner.png")
         self.banner_image = ImageLabel(f"{banner_path}")
-        self.banner_image.scaledToHeight(350)
+        self.banner_image.scaledToHeight(300)
         self.banner_image.setBorderRadius(12, 12, 12, 12)
         self.banner_image.setScaledContents(True)
 
