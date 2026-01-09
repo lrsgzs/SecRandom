@@ -232,11 +232,35 @@ class WindowManager:
 
     def show_settings_window_about(self) -> None:
         """显示关于窗口"""
-        if self.settings_window is None:
-            self.create_settings_window()
+        from app.common.safety.verify_ops import (
+            should_require_password,
+            require_and_run,
+        )
 
-        if self.settings_window is not None:
-            self.settings_window.show_settings_window_about()
+        def on_verified() -> None:
+            """验证通过后，正常打开关于窗口"""
+            if self.settings_window is None:
+                self.create_settings_window()
+
+            if self.settings_window is not None:
+                self.show_settings_window("aboutInterface", is_preview=False)
+
+        def on_preview() -> None:
+            """点击预览按钮后，以预览模式打开关于窗口"""
+            if self.settings_window is None:
+                self.create_settings_window()
+
+            if self.settings_window is not None:
+                self.show_settings_window("aboutInterface", is_preview=True)
+
+        if should_require_password("open_settings"):
+            logger.debug("打开关于窗口需要验证")
+            require_and_run(
+                "open_settings", self.main_window, on_verified, on_preview=on_preview
+            )
+        else:
+            logger.debug("打开关于窗口无需验证")
+            on_verified()
 
     def create_float_window(self) -> None:
         """创建浮窗实例"""

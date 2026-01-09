@@ -313,7 +313,12 @@ class URLCommandHandler(QObject):
 
         def execute_command():
             """验证通过后执行命令"""
-            return self._execute_command(command, params)
+            try:
+                result = self._execute_command(command, params)
+                logger.debug(f"验证后执行命令完成: {command}, 结果: {result}")
+                return result
+            except Exception as e:
+                logger.error(f"验证后执行命令失败: {command}, 错误: {e}")
 
         # 调用验证窗口
         create_verify_password_window(on_verified=execute_command, operation_type=op)

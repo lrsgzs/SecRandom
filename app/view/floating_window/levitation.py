@@ -46,8 +46,8 @@ class LevitationWindow(QWidget):
     DEFAULT_ICON_SIZE = QSize(24, 24)  # 图标大小
     DEFAULT_SPACING = 6
     DEFAULT_MARGINS = 6  # 贴边隐藏时的最小间距
-    DRAG_THRESHOLD = 8  # 拖拽触发阈值，增加阈值避免误识别按钮点击为拖动
-    MIN_DRAG_TIME = 50  # 最小拖动识别时间（毫秒），避免极短时间内的移动被识别为拖动
+    DRAG_THRESHOLD = 12  # 拖拽触发阈值，增加阈值避免误识别按钮点击为拖动
+    MIN_DRAG_TIME = 100  # 最小拖动识别时间（毫秒），避免极短时间内的移动被识别为拖动
 
     def __init__(self, parent=None):
         """初始化悬浮窗窗口"""
@@ -1435,9 +1435,12 @@ class LevitationWindow(QWidget):
             Qt.FramelessWindowHint
             | Qt.WindowStaysOnTopHint
             | Qt.Tool
-            | Qt.NoFocus
             | Qt.NoDropShadowWindowHint
         )
+        if self._do_not_steal_focus:
+            self.arrow_widget.setWindowFlags(
+                self.arrow_widget.windowFlags() | Qt.WindowDoesNotAcceptFocus
+            )
 
         # 设置容器透明
         self.arrow_widget.setAttribute(Qt.WA_TranslucentBackground)

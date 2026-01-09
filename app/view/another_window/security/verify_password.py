@@ -585,14 +585,14 @@ class VerifyPasswordWindow(QWidget):
                 self.usb_poll_timer.stop()
             if hasattr(self, "_usb_thread"):
                 try:
-                    self._usb_thread.quit()
-                    self._usb_thread.wait(300)
+                    self._usb_thread.terminate()
+                    self._usb_thread.wait(500)
                 except Exception:
                     pass
             if hasattr(self, "_verify_thread"):
                 try:
-                    self._verify_thread.quit()
-                    self._verify_thread.wait(300)
+                    self._verify_thread.terminate()
+                    self._verify_thread.wait(500)
                 except Exception:
                     pass
         except Exception:
@@ -602,3 +602,8 @@ class VerifyPasswordWindow(QWidget):
                 parent.close()
                 break
             parent = parent.parent()
+
+    def closeEvent(self, event):
+        """窗口关闭时清理线程"""
+        self.__cancel()
+        super().closeEvent(event)
