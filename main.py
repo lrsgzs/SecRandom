@@ -3,6 +3,7 @@ import sys
 import time
 import gc
 
+import sentry_sdk
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import QApplication
 from loguru import logger
@@ -35,6 +36,18 @@ def main():
 
     logger.remove()
     configure_logging()
+
+    sentry_sdk.init(
+        dsn="https://f079219d4004591e72e6e4e4155023fe@o4510689230192640.ingest.us.sentry.io/4510689241071616",
+        send_default_pii=True,
+    )
+
+    def sentry_handler(message):
+        record = message.record
+        if record["level"].name == "ERROR":
+            sentry_sdk.capture_message(message, level=record["level"].name)
+
+    logger.add(sentry_handler, level="ERROR")
 
     wm.app_start_time = time.perf_counter()
 
