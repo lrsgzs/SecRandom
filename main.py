@@ -45,7 +45,7 @@ def main():
         return event
 
     sentry_sdk.init(
-        dsn="https://f48074b49e319f7b952583c283046259@o4510289605296128.ingest.de.sentry.io/4510681366659152",
+        dsn="https://f079219d4004591e72e6e4e4155023fe@o4510689230192640.ingest.us.sentry.io/4510689241071616",
         integrations=[
             LoguruIntegration(
                 level=LoggingLevels.INFO.value,
