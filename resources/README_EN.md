@@ -196,4 +196,4 @@ Check out our Contributing Guidelines to learn more:
 </picture>
 
 
-**Copyright © 2025 SECTL**
+**Copyright © 2025-2026 SECTL**
