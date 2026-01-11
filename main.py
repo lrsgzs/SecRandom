@@ -12,7 +12,7 @@ from loguru import logger
 from app.tools.path_utils import get_app_root
 from app.tools.config import configure_logging
 from app.tools.settings_access import readme_settings_async
-from app.tools.variable import APP_QUIT_ON_LAST_WINDOW_CLOSED
+from app.tools.variable import APP_QUIT_ON_LAST_WINDOW_CLOSED, VERSION
 from app.core.single_instance import (
     check_single_instance,
     setup_local_server,
@@ -44,8 +44,15 @@ def main():
             return None
         return event
 
+    # 设置 Sentry 环境和版本
+    # 开发环境：包含 "0.0.0" 的版本号
+    # 生产环境：不包含 "0.0.0" 的版本号
+    environment = "development" if "0.0.0" in VERSION else "production"
+
     sentry_sdk.init(
         dsn="https://f48074b49e319f7b952583c283046259@o4510289605296128.ingest.de.sentry.io/4510681366659152",
+        environment=environment,
+        release=VERSION,
         integrations=[
             LoguruIntegration(
                 level=LoggingLevels.INFO.value,
@@ -54,7 +61,6 @@ def main():
         ],
         before_send=before_send,
         send_default_pii=True,
-        enable_logs=True,
     )
 
     wm.app_start_time = time.perf_counter()
@@ -69,7 +75,6 @@ def main():
                 if arg.startswith("secrandom://"):
                     send_url_to_existing_instance(arg)
                     break
-
         logger.info("程序将退出，已有实例已激活")
         sys.exit(0)
 
