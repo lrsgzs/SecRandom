@@ -458,6 +458,11 @@ class ResultDisplayUtils:
         返回:
             list: 创建的标签列表
         """
+        # 检查 selected_students 是否为 None，避免后续的 len() 调用和迭代操作失败
+        if selected_students is None:
+            logger.warning("create_student_label: selected_students 为 None，可能是未设置默认班级或抽取名单")
+            return []
+
         student_labels = []
 
         # 内存优化：预分配列表容量
