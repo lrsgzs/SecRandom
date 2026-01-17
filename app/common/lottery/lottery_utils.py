@@ -1,7 +1,6 @@
 # ==================================================
 # 抽奖工具类
 # ==================================================
-import json
 from random import SystemRandom
 
 from app.common.data.list import (
@@ -19,7 +18,6 @@ from app.tools.config import (
     read_drawn_record_simple,
     reset_drawn_record,
 )
-from app.tools.path_utils import get_data_path, open_file
 from app.tools.settings_access import readme_settings_async, get_safe_font_size
 
 from app.Language.obtain_language import get_any_position_value
@@ -142,9 +140,7 @@ class LotteryUtils:
         Returns:
             dict: 包含抽取结果的字典
         """
-        student_file = get_data_path("list/roll_call_list", f"{class_name}.json")
-        with open_file(student_file, "r", encoding="utf-8") as f:
-            data = json.load(f)
+        data = get_student_list(class_name)
 
         students_data = filter_students_data(
             data, group_index, group_filter, gender_index, gender_filter
@@ -222,6 +218,7 @@ class LotteryUtils:
             weights = [1.0] * len(students_dict_list)
 
         # 应用内幕设置（抽奖模式下按奖池应用权重）
+        guaranteed_students = None
         if pool_name:
             students_with_weight, behind_scenes_weights = (
                 BehindScenesUtils.apply_probability_weights(
@@ -233,61 +230,111 @@ class LotteryUtils:
             guaranteed_students = BehindScenesUtils.ensure_guaranteed_selection(
                 students_with_weight, behind_scenes_weights, class_name, pool_name
             )
-            if guaranteed_students is not None:
-                # 存在必中人员，直接返回
-                selected_students = []
-                selected_students_dict = []
-                for student in guaranteed_students:
-                    selected_students.append(
-                        (
-                            student.get("id"),
-                            student.get("name"),
-                            student.get("exist", True),
-                        )
-                    )
-                    selected_students_dict.append(student)
-
-                return {
-                    "selected_students": selected_students,
-                    "class_name": class_name,
-                    "selected_students_dict": selected_students_dict,
-                    "group_filter": group_filter,
-                    "gender_filter": gender_filter,
-                }
 
             # 使用内幕设置的权重
             weights = behind_scenes_weights
 
-        draw_count = current_count
-        draw_count = min(draw_count, len(students_with_weight))
+        draw_count = int(current_count or 0)
+        if draw_count <= 0:
+            return {
+                "selected_students": [],
+                "class_name": class_name,
+                "selected_students_dict": [],
+                "group_filter": group_filter,
+                "gender_filter": gender_filter,
+            }
+
+        allow_repeat = half_repeat <= 0 and draw_count > len(students_with_weight)
+        if half_repeat > 0 and draw_count > len(students_with_weight):
+            return {"reset_required": True}
 
         selected_students = []
         selected_students_dict = []
-        for _ in range(draw_count):
-            if not students_with_weight:
-                break
-            total_weight = sum(weights)
-            if total_weight <= 0:
-                random_index = system_random.randint(0, len(students_with_weight) - 1)
-            else:
-                rand_value = system_random.uniform(0, total_weight)
-                cumulative_weight = 0
-                random_index = 0
-                for i, weight in enumerate(weights):
-                    cumulative_weight += weight
-                    if rand_value <= cumulative_weight:
-                        random_index = i
+        if guaranteed_students:
+            for student in guaranteed_students:
+                selected_students.append(
+                    (
+                        student.get("id"),
+                        student.get("name"),
+                        student.get("exist", True),
+                    )
+                )
+                selected_students_dict.append(student)
+
+            if not allow_repeat:
+                guaranteed_ids = {s.get("id") for s in guaranteed_students}
+                filtered_candidates = []
+                filtered_weights = []
+                for idx, s in enumerate(students_with_weight):
+                    if s.get("id") in guaranteed_ids:
+                        continue
+                    filtered_candidates.append(s)
+                    filtered_weights.append(weights[idx] if idx < len(weights) else 1.0)
+                students_with_weight = filtered_candidates
+                weights = filtered_weights
+
+        remaining_to_draw = draw_count - len(selected_students_dict)
+        if remaining_to_draw > 0:
+            if allow_repeat:
+                pick_candidates = students_with_weight
+                pick_weights = weights
+                if not pick_candidates and selected_students_dict:
+                    pick_candidates = selected_students_dict
+                    pick_weights = [1.0] * len(selected_students_dict)
+
+                for _ in range(remaining_to_draw):
+                    if not pick_candidates:
                         break
+                    total_weight = sum(pick_weights)
+                    if total_weight <= 0:
+                        random_index = system_random.randint(
+                            0, len(pick_candidates) - 1
+                        )
+                    else:
+                        rand_value = system_random.uniform(0, total_weight)
+                        cumulative_weight = 0
+                        random_index = 0
+                        for i, weight in enumerate(pick_weights):
+                            cumulative_weight += weight
+                            if rand_value <= cumulative_weight:
+                                random_index = i
+                                break
 
-            selected_student = students_with_weight[random_index]
-            id = selected_student.get("id", "")
-            random_name = selected_student.get("name", "")
-            exist = selected_student.get("exist", True)
-            selected_students.append((id, random_name, exist))
-            selected_students_dict.append(selected_student)
+                    selected_student = pick_candidates[random_index]
+                    student_id = selected_student.get("id", "")
+                    random_name = selected_student.get("name", "")
+                    exist = selected_student.get("exist", True)
+                    selected_students.append((student_id, random_name, exist))
+                    selected_students_dict.append(selected_student)
+            else:
+                remaining_to_draw = min(remaining_to_draw, len(students_with_weight))
+                for _ in range(remaining_to_draw):
+                    if not students_with_weight:
+                        break
+                    total_weight = sum(weights)
+                    if total_weight <= 0:
+                        random_index = system_random.randint(
+                            0, len(students_with_weight) - 1
+                        )
+                    else:
+                        rand_value = system_random.uniform(0, total_weight)
+                        cumulative_weight = 0
+                        random_index = 0
+                        for i, weight in enumerate(weights):
+                            cumulative_weight += weight
+                            if rand_value <= cumulative_weight:
+                                random_index = i
+                                break
 
-            students_with_weight.pop(random_index)
-            weights.pop(random_index)
+                    selected_student = students_with_weight[random_index]
+                    student_id = selected_student.get("id", "")
+                    random_name = selected_student.get("name", "")
+                    exist = selected_student.get("exist", True)
+                    selected_students.append((student_id, random_name, exist))
+                    selected_students_dict.append(selected_student)
+
+                    students_with_weight.pop(random_index)
+                    weights.pop(random_index)
 
         return {
             "selected_students": selected_students,
@@ -496,60 +543,20 @@ class LotteryUtils:
     def draw_random_groups(students_dict_list, current_count, draw_type):
         """
         抽取随机小组
-
-        Args:
-            students_dict_list: 学生字典列表
-            current_count: 当前抽取数量
-            draw_type: 抽取类型
-
-        Returns:
-            list: 选中的小组列表
         """
-        # 小组模式下，students_data已经只包含小组信息
-        # 直接使用小组数据进行抽取
-        draw_count = min(current_count, len(students_dict_list))
+        # 小组模式下，students_dict_list已经只包含小组信息
+        weights = [1.0] * len(students_dict_list)
 
-        selected_groups = []
-        if draw_type == 1:
-            # 权重抽取模式下，所有小组权重相同
-            weights = [1.0] * len(students_dict_list)
+        selected_groups, _ = LotteryUtils._perform_weighted_draw(
+            students_dict_list, current_count, weights
+        )
 
-            # 根据权重抽取小组
-            for _ in range(draw_count):
-                if not students_dict_list:
-                    break
-                total_weight = sum(weights)
-                if total_weight <= 0:
-                    random_index = system_random.randint(0, len(students_dict_list) - 1)
-                else:
-                    rand_value = system_random.uniform(0, total_weight)
-                    cumulative_weight = 0
-                    random_index = 0
-                    for i, weight in enumerate(weights):
-                        cumulative_weight += weight
-                        if rand_value <= cumulative_weight:
-                            random_index = i
-                            break
-
-                selected_group = students_dict_list[random_index]
-                selected_groups.append(
-                    (None, selected_group["name"], True)
-                )  # (id, name, exist)
-
-                students_dict_list.pop(random_index)
-                weights.pop(random_index)
-        else:
-            # 随机抽取模式
-            for _ in range(draw_count):
-                if not students_dict_list:
-                    break
-                random_index = system_random.randint(0, len(students_dict_list) - 1)
-                selected_group = students_dict_list[random_index]
-                selected_groups.append(
-                    (None, selected_group["name"], True)
-                )  # (id, name, exist)
-
-                students_dict_list.pop(random_index)
+        # format: (id, name, exist) -> (None, name, True)
+        # _perform_weighted_draw returns (id, name, exist)
+        # But for groups, we want (None, name, True)
+        # Check what _perform_weighted_draw returns based on input.
+        # Input students_dict_list has id, name, exist.
+        # So it should be fine.
 
         return selected_groups
 
@@ -564,41 +571,40 @@ class LotteryUtils:
         # 读取所有相关设置并传递给通知服务
         settings = {
             # 点名设置
-            "font_size": get_safe_font_size("roll_call_settings", "font_size"),
+            "font_size": get_safe_font_size("lottery_settings", "font_size"),
             "animation_color_theme": readme_settings_async(
-                "roll_call_settings", "animation_color_theme"
+                "lottery_settings", "animation_color_theme"
             ),
             "display_format": readme_settings_async(
-                "roll_call_settings", "display_format"
+                "lottery_settings", "display_format"
             ),
-            "student_image": readme_settings_async(
-                "roll_call_settings", "student_image"
-            ),
+            "student_image": readme_settings_async("lottery_settings", "student_image"),
+            "show_random": readme_settings_async("lottery_settings", "show_random"),
             # 浮窗设置
             "animation": readme_settings_async(
-                "roll_call_notification_settings", "animation"
+                "lottery_notification_settings", "animation"
             ),
             "transparency": readme_settings_async(
-                "roll_call_notification_settings", "floating_window_transparency"
+                "lottery_notification_settings", "floating_window_transparency"
             ),
             "auto_close_time": readme_settings_async(
-                "roll_call_notification_settings", "floating_window_auto_close_time"
+                "lottery_notification_settings", "floating_window_auto_close_time"
             ),
             "enabled_monitor": readme_settings_async(
-                "roll_call_notification_settings", "floating_window_enabled_monitor"
+                "lottery_notification_settings", "floating_window_enabled_monitor"
             ),
             "window_position": readme_settings_async(
-                "roll_call_notification_settings", "floating_window_position"
+                "lottery_notification_settings", "floating_window_position"
             ),
             "horizontal_offset": readme_settings_async(
-                "roll_call_notification_settings", "floating_window_horizontal_offset"
+                "lottery_notification_settings", "floating_window_horizontal_offset"
             ),
             "vertical_offset": readme_settings_async(
-                "roll_call_notification_settings", "floating_window_vertical_offset"
+                "lottery_notification_settings", "floating_window_vertical_offset"
             ),
             # 通知设置
             "notification_display_duration": readme_settings_async(
-                "roll_call_notification_settings", "notification_display_duration"
+                "lottery_notification_settings", "notification_display_duration"
             ),
         }
 

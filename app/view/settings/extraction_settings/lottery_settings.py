@@ -396,6 +396,22 @@ class lottery_display_settings(GroupHeaderCardWidget):
             )
         )
 
+        # 显示随机学生格式下拉框
+        self.random_student_format_combo = ComboBox()
+        self.random_student_format_combo.addItems(
+            get_content_combo_name_async("lottery_settings", "show_random")
+        )
+        self.random_student_format_combo.setCurrentIndex(
+            readme_settings_async("lottery_settings", "show_random")
+        )
+        self.random_student_format_combo.currentIndexChanged.connect(
+            lambda: update_settings(
+                "lottery_settings",
+                "show_random",
+                self.random_student_format_combo.currentIndex(),
+            )
+        )
+
         # 添加设置项到分组
         if is_setting_visible("lottery_settings", "use_global_font"):
             self.addGroup(
@@ -422,6 +438,12 @@ class lottery_display_settings(GroupHeaderCardWidget):
             get_content_name_async("lottery_settings", "display_format"),
             get_content_description_async("lottery_settings", "display_format"),
             self.display_format_combo,
+        )
+        self.addGroup(
+            get_theme_icon("ic_fluent_slide_text_sparkle_20_filled"),
+            get_content_name_async("lottery_settings", "show_random"),
+            get_content_description_async("lottery_settings", "show_random"),
+            self.random_student_format_combo,
         )
 
 

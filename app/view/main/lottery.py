@@ -20,6 +20,7 @@ from app.common.history import *
 from app.common.display.result_display import *
 from app.tools.config import *
 from app.common.lottery.lottery_utils import LotteryUtils
+from app.common.lottery.lottery_manager import LotteryManager
 from app.tools.variable import *
 from app.common.voice.voice import TTSHandler
 from app.common.music.music_player import music_player
@@ -57,6 +58,7 @@ class Lottery(QWidget):
         self.tts_handler = TTSHandler()
 
         self.is_animating = False
+        self.manager = LotteryManager()
 
         self.initUI()
         self.setupSettingsListener()
@@ -560,6 +562,29 @@ class Lottery(QWidget):
 
     def _do_start_draw(self):
         """实际执行开始抽取的逻辑"""
+        # 加载数据到管理器
+        pool_name = self.pool_list_combobox.currentText()
+
+        class_name = self.list_combobox.currentText()
+        group_filter = self.range_combobox.currentText()
+        gender_filter = self.gender_combobox.currentText()
+        group_index = self.range_combobox.currentIndex()
+        gender_index = self.gender_combobox.currentIndex()
+
+        # 检查是否选择了有效的班级
+        list_base_options = get_content_combo_name_async("lottery", "list_combobox")
+        if list_base_options and class_name in list_base_options:
+            class_name = None
+
+        self.manager.load_data(
+            pool_name,
+            class_name,
+            group_filter,
+            gender_filter,
+            group_index,
+            gender_index,
+        )
+
         self.start_button.setText(
             get_content_pushbutton_name_async("lottery", "start_button")
         )
@@ -626,15 +651,7 @@ class Lottery(QWidget):
             )
             self.start_button.clicked.connect(lambda: self.start_draw())
         elif animation == 2:
-            if hasattr(self, "final_selected_students_dict") and hasattr(
-                self, "final_pool_name"
-            ):
-                save_lottery_history(
-                    pool_name=self.final_pool_name,
-                    selected_students=self.final_selected_students_dict,
-                    group_filter=self.final_group_filter,
-                    gender_filter=self.final_gender_filter,
-                )
+            self.stop_animation()
             self.start_button.clicked.connect(lambda: self.start_draw())
 
     def start_draw(self):
@@ -675,6 +692,29 @@ class Lottery(QWidget):
         # 停止动画音乐
         music_player.stop_music(fade_out=True)
 
+        # 执行最终抽取
+        result = self.manager.draw_final_items(self.current_count)
+
+        # 处理需要重置的情况
+        if "reset_required" in result and result["reset_required"]:
+            reset_drawn_prize_record(self, self.manager.current_pool_name)
+            return
+
+        self.final_selected_students = result.get("selected_prizes") or result.get(
+            "selected_students"
+        )
+        self.final_pool_name = result["pool_name"]
+        self.final_selected_students_dict = result.get(
+            "selected_prizes_dict"
+        ) or result.get("selected_students_dict")
+
+        # 获取筛选条件
+        self.final_group_filter = self.range_combobox.currentText()
+        self.final_gender_filter = self.gender_combobox.currentText()
+
+        # 更新显示
+        self.display_result(self.final_selected_students, self.final_pool_name)
+
         # 播放结果音乐
         result_music = readme_settings_async("lottery_settings", "result_music")
         if result_music:
@@ -685,13 +725,17 @@ class Lottery(QWidget):
                 fade_in=True,
             )
 
-        half_repeat = readme_settings_async("lottery_settings", "half_repeat")
-        if half_repeat > 0:
-            record_drawn_prize(
-                pool_name=self.final_pool_name,
-                prize_names=self.final_selected_students,
-            )
+        threshold = LotteryUtils._get_prize_draw_threshold()
+        save_temp = threshold is not None
 
+        self.manager.save_result(
+            self.final_selected_students_dict,
+            self.final_group_filter,
+            self.final_gender_filter,
+            save_temp=save_temp,
+        )
+
+        if save_temp:
             self.update_many_count_label()
 
             if (
@@ -704,39 +748,26 @@ class Lottery(QWidget):
             # 更新剩余名单窗口
             QTimer.singleShot(APP_INIT_DELAY, self._update_remaining_list_delayed)
 
-        if hasattr(self, "final_selected_students") and hasattr(
-            self, "final_pool_name"
-        ):
-            save_lottery_history(
-                pool_name=self.final_pool_name,
-                selected_students=self.final_selected_students_dict,
-                group_filter=self.final_group_filter,
-                gender_filter=self.final_gender_filter,
-            )
-
         if hasattr(self, "final_selected_students"):
             self.display_result(self.final_selected_students, self.final_pool_name)
 
-            # 检查是否启用了通知服务
             call_notification_service = readme_settings_async(
                 "lottery_notification_settings", "call_notification_service"
             )
-            # 检查是否启用了最大浮窗通知奖数功能
-            use_main_window_when_exceed_threshold = readme_settings_async(
-                "lottery_notification_settings", "use_main_window_when_exceed_threshold"
-            )
-            # 检查奖数是否超过最大浮窗通知奖数
-            max_notify_count = readme_settings_async(
-                "lottery_notification_settings", "main_window_display_threshold"
-            )
+
             if call_notification_service:
-                # 准备通知设置
                 settings = LotteryUtils.prepare_notification_settings()
-                # 只有当没有启用阈值功能，或者启用了但抽取奖数没有超过阈值时，才显示通知
+
+                use_main_window_when_exceed_threshold = readme_settings_async(
+                    "lottery_notification_settings",
+                    "use_main_window_when_exceed_threshold",
+                )
+                max_notify_count = readme_settings_async(
+                    "lottery_notification_settings", "main_window_display_threshold"
+                )
+
                 if use_main_window_when_exceed_threshold:
-                    # 如果启用了阈值功能，检查抽取奖数是否超过阈值
                     if self.current_count <= max_notify_count:
-                        # 使用ResultDisplayUtils显示通知
                         ResultDisplayUtils.show_notification_if_enabled(
                             self.final_pool_name,
                             self.final_selected_students,
@@ -745,7 +776,6 @@ class Lottery(QWidget):
                             settings_group="lottery_notification_settings",
                         )
                 else:
-                    # 如果没有启用阈值功能，直接显示通知
                     ResultDisplayUtils.show_notification_if_enabled(
                         self.final_pool_name,
                         self.final_selected_students,
@@ -802,111 +832,16 @@ class Lottery(QWidget):
 
     def draw_random(self):
         """抽取随机结果"""
-        pool_name = self.pool_list_combobox.currentText()
-        group_index = self.range_combobox.currentIndex()
-        group_filter = self.range_combobox.currentText()
-        gender_index = self.gender_combobox.currentIndex()
-        gender_filter = self.gender_combobox.currentText()
-        half_repeat = readme_settings_async("lottery_settings", "half_repeat")
-
-        result = LotteryUtils.draw_random_prizes(
-            pool_name,
-            self.current_count,
-        )
-
-        # 处理需要重置的情况
-        if "reset_required" in result and result["reset_required"]:
-            reset_drawn_prize_record(self, pool_name)
-            return
-
-        self.final_selected_students = result.get("selected_prizes") or result.get(
-            "selected_students"
-        )
-        self.final_pool_name = result["pool_name"]
-        self.final_selected_students_dict = result.get(
-            "selected_prizes_dict"
-        ) or result.get("selected_students_dict")
-        self.final_group_filter = group_filter
-        self.final_gender_filter = gender_filter
-
-        # 根据"跟随学生"模式拼接显示
-        try:
-            list_base_options = get_content_combo_name_async("lottery", "list_combobox")
-        except Exception:
-            list_base_options = []
-        selected_text = self.list_combobox.currentText()
-        if list_base_options and selected_text not in list_base_options:
-            try:
-                # 获取抽中的奖品列表
-                prize_names = [item[1] for item in (self.final_selected_students or [])]
-
-                # 抽取与奖品数量相同的学生（不重复规则由学生设置决定，此处不启用半重复）
-                student_result = LotteryUtils.draw_random_students(
-                    selected_text,
-                    0,
-                    "",
-                    0,
-                    "",
-                    len(self.final_selected_students or []),
-                    0,
-                    pool_name,  # 传入奖池名称，用于应用内幕设置
-                    prize_names,  # 传入奖品列表，用于提高指定该奖品的学生的权重
-                )
-                student_names = [
-                    s[1] for s in (student_result.get("selected_students") or [])
-                ]
-                paired = []
-                for i, item in enumerate(self.final_selected_students or []):
-                    pid, pname, pexist = item
-                    sname = student_names[i] if i < len(student_names) else ""
-                    display_name = f"{pname} {sname}" if sname else pname
-                    paired.append((pid, display_name, pexist))
-                self.final_selected_students = paired
-            except Exception as e:
-                logger.exception(f"奖池跟随学生拼接失败: {e}")
-
         if self.is_animating:
-            self.display_result_animated(
-                self.final_selected_students, self.final_pool_name
-            )
-        else:
-            self.display_result(self.final_selected_students, self.final_pool_name)
+            prizes = self.manager.get_random_items(self.current_count)
+            # 格式化为 UI 需要的格式 [(id, name, exist)]
+            selected_prizes = []
+            for p in prizes:
+                selected_prizes.append((p["id"], p["name"], p.get("exist", True)))
 
-        # 检查是否启用了通知服务
-        call_notification_service = readme_settings_async(
-            "lottery_notification_settings", "call_notification_service"
-        )
-        # 检查是否启用了最大浮窗通知奖数功能
-        use_main_window_when_exceed_threshold = readme_settings_async(
-            "roll_call_notification_settings", "use_main_window_when_exceed_threshold"
-        )
-        # 检查奖数是否超过最大浮窗通知奖数
-        max_notify_count = readme_settings_async(
-            "roll_call_notification_settings", "main_window_display_threshold"
-        )
-        if call_notification_service:
-            # 准备通知设置
-            settings = LotteryUtils.prepare_notification_settings()
-            if use_main_window_when_exceed_threshold:
-                # 如果启用了阈值功能，检查抽取奖数是否超过阈值
-                if self.current_count <= max_notify_count:
-                    # 使用ResultDisplayUtils显示通知
-                    ResultDisplayUtils.show_notification_if_enabled(
-                        self.final_pool_name,
-                        self.final_selected_students,
-                        self.current_count,
-                        settings,
-                        settings_group="lottery_notification_settings",
-                    )
-            else:
-                # 如果未启用阈值功能，直接显示通知
-                ResultDisplayUtils.show_notification_if_enabled(
-                    self.final_pool_name,
-                    self.final_selected_students,
-                    self.current_count,
-                    settings,
-                    settings_group="lottery_notification_settings",
-                )
+            self.display_result_animated(
+                selected_prizes, self.manager.current_pool_name
+            )
 
     def display_result(self, selected_students, pool_name):
         """显示抽取结果"""
@@ -958,6 +893,20 @@ class Lottery(QWidget):
 
         ResultDisplayUtils.display_results_in_grid(self.result_grid, student_labels)
 
+        call_notification_service = readme_settings_async(
+            "lottery_notification_settings", "call_notification_service"
+        )
+        if call_notification_service:
+            settings = LotteryUtils.prepare_notification_settings()
+            ResultDisplayUtils.show_notification_if_enabled(
+                pool_name,
+                selected_students,
+                self.current_count,
+                settings,
+                settings_group="lottery_notification_settings",
+                is_animating=True,
+            )
+
     def _do_reset_count(self):
         """实际执行重置奖数的逻辑"""
         self.current_count = 1
@@ -965,7 +914,39 @@ class Lottery(QWidget):
         self.minus_button.setEnabled(False)
         self.plus_button.setEnabled(True)
         pool_name = self.pool_list_combobox.currentText()
-        reset_drawn_prize_record(self, pool_name)
+
+        class_name = self.list_combobox.currentText()
+        group_filter = self.range_combobox.currentText()
+        gender_filter = self.gender_combobox.currentText()
+        group_index = self.range_combobox.currentIndex()
+        gender_index = self.gender_combobox.currentIndex()
+
+        # 检查是否选择了有效的班级
+        list_base_options = get_content_combo_name_async("lottery", "list_combobox")
+        if list_base_options and class_name in list_base_options:
+            class_name = None
+
+        # 使用管理器重置记录
+        self.manager.load_data(
+            pool_name,
+            class_name,
+            group_filter,
+            gender_filter,
+            group_index,
+            gender_index,
+        )
+        self.manager.reset_records(parent=self)
+
+        show_notification(
+            NotificationType.INFO,
+            NotificationConfig(
+                title="提示",
+                content=f"已重置{pool_name}奖池抽取记录",
+                icon=FluentIcon.INFO,
+            ),
+            parent=self,
+        )
+
         self.clear_result()
         self.update_many_count_label()
 

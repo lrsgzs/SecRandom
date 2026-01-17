@@ -52,6 +52,9 @@ class lottery_history_table(GroupHeaderCardWidget):
         self.is_loading = False  # 是否正在加载数据
         self.has_class_record = False  # 是否有课程记录
         self.available_subjects = []  # 可用的课程列表
+        self.cached_lotterys_data = []  # 缓存的奖品数据列表
+        self.cached_sessions_data = []  # 缓存的会话数据列表
+        self.cached_stats_data = []  # 缓存的统计数据列表
 
         # 创建奖池选择区域
         QTimer.singleShot(APPLY_DELAY, self.create_pool_selection)
@@ -237,6 +240,11 @@ class lottery_history_table(GroupHeaderCardWidget):
         self.current_row = 0
         self.table.setRowCount(0)
 
+        # 清空缓存，确保排序时重新获取数据
+        self.cached_lotterys_data = []
+        self.cached_sessions_data = []
+        self.cached_stats_data = []
+
         # 重新加载数据
         self.refresh_data()
 
@@ -368,28 +376,38 @@ class lottery_history_table(GroupHeaderCardWidget):
         if not self.current_pool_name:
             return
         try:
-            cleaned_lotterys = get_lottery_pool_list(self.current_pool_name)
-            history_data = get_lottery_history_data(self.current_pool_name)
+            # 如果是第一次加载（current_row == 0），获取并排序数据
+            if self.current_row == 0:
+                cleaned_lotterys = get_lottery_pool_list(self.current_pool_name)
+                history_data = get_lottery_history_data(self.current_pool_name)
 
-            lotterys_data = get_lottery_prizes_data(cleaned_lotterys, history_data)
+                lotterys_data = get_lottery_prizes_data(cleaned_lotterys, history_data)
 
-            format_weight, _, _ = format_weight_for_display(lotterys_data, "weight")
+                format_weight, _, _ = format_weight_for_display(lotterys_data, "weight")
 
-            if self.sort_column >= 0:
+                if self.sort_column >= 0:
 
-                def sort_key(lottery):
-                    if self.sort_column == 0:
-                        return lottery.get("id", "")
-                    elif self.sort_column == 1:
-                        return lottery.get("name", "")
-                    elif self.sort_column == 2:
-                        return lottery.get("total_count", 0)
-                    elif self.sort_column == 3:
-                        return lottery.get("weight", "")
-                    return ""
+                    def sort_key(lottery):
+                        if self.sort_column == 0:
+                            return lottery.get("id", "")
+                        elif self.sort_column == 1:
+                            return lottery.get("name", "")
+                        elif self.sort_column == 2:
+                            return lottery.get("total_count", 0)
+                        elif self.sort_column == 3:
+                            return lottery.get("weight", "")
+                        return ""
 
-                reverse_order = self.sort_order == Qt.SortOrder.DescendingOrder
-                lotterys_data.sort(key=sort_key, reverse=reverse_order)
+                    reverse_order = self.sort_order == Qt.SortOrder.DescendingOrder
+                    lotterys_data.sort(key=sort_key, reverse=reverse_order)
+
+                # 缓存排序后的数据
+                self.cached_lotterys_data = lotterys_data
+                self.cached_lotterys_format_weight = format_weight
+            else:
+                # 使用缓存的数据
+                lotterys_data = self.cached_lotterys_data
+                format_weight = self.cached_lotterys_format_weight
 
             start_row = self.current_row
             end_row = min(start_row + self.batch_size, self.total_rows)
@@ -426,40 +444,52 @@ class lottery_history_table(GroupHeaderCardWidget):
         if not self.current_pool_name:
             return
         try:
-            cleaned_lotterys = get_lottery_pool_list(self.current_pool_name)
-            history_data = get_lottery_history_data(self.current_pool_name)
+            # 如果是第一次加载（current_row == 0），获取并排序数据
+            if self.current_row == 0:
+                cleaned_lotterys = get_lottery_pool_list(self.current_pool_name)
+                history_data = get_lottery_history_data(self.current_pool_name)
 
-            lotterys_data = get_lottery_session_data(
-                cleaned_lotterys, history_data, self.current_subject
-            )
+                lotterys_data = get_lottery_session_data(
+                    cleaned_lotterys, history_data, self.current_subject
+                )
 
-            self.has_class_record = any(
-                lottery.get("class_name", "") for lottery in lotterys_data
-            )
+                self.has_class_record = any(
+                    lottery.get("class_name", "") for lottery in lotterys_data
+                )
 
-            self.update_table_headers()
+                self.update_table_headers()
 
-            format_weight, _, _ = format_weight_for_display(lotterys_data, "weight")
+                format_weight, _, _ = format_weight_for_display(lotterys_data, "weight")
 
-            if self.sort_column >= 0:
+                if self.sort_column >= 0:
 
-                def sort_key(lottery):
-                    if self.sort_column == 0:
-                        return lottery.get("draw_time", "")
-                    elif self.sort_column == 1:
-                        return lottery.get("id", "")
-                    elif self.sort_column == 2:
-                        return lottery.get("name", "")
-                    elif self.sort_column == 3:
-                        return lottery.get("class_name", "")
-                    elif self.sort_column == 4:
-                        return lottery.get("weight", "")
-                    return ""
+                    def sort_key(lottery):
+                        if self.sort_column == 0:
+                            return lottery.get("draw_time", "")
+                        elif self.sort_column == 1:
+                            return lottery.get("id", "")
+                        elif self.sort_column == 2:
+                            return lottery.get("name", "")
+                        elif self.sort_column == 3:
+                            return lottery.get("class_name", "")
+                        elif self.sort_column == 4:
+                            return lottery.get("weight", "")
+                        return ""
 
-                reverse_order = self.sort_order == Qt.SortOrder.DescendingOrder
-                lotterys_data.sort(key=sort_key, reverse=reverse_order)
+                    reverse_order = self.sort_order == Qt.SortOrder.DescendingOrder
+                    lotterys_data.sort(key=sort_key, reverse=reverse_order)
+                else:
+                    lotterys_data.sort(
+                        key=lambda x: x.get("draw_time", ""), reverse=True
+                    )
+
+                # 缓存排序后的数据
+                self.cached_sessions_data = lotterys_data
+                self.cached_sessions_format_weight = format_weight
             else:
-                lotterys_data.sort(key=lambda x: x.get("draw_time", ""), reverse=True)
+                # 使用缓存的数据
+                lotterys_data = self.cached_sessions_data
+                format_weight = self.cached_sessions_format_weight
 
             start_row = self.current_row
             end_row = min(start_row + self.batch_size, self.total_rows)
@@ -504,38 +534,50 @@ class lottery_history_table(GroupHeaderCardWidget):
         if not self.current_pool_name:
             return
         try:
-            cleaned_lotterys = get_lottery_pool_list(self.current_pool_name)
-            history_data = get_lottery_history_data(self.current_pool_name)
+            # 如果是第一次加载（current_row == 0），获取并排序数据
+            if self.current_row == 0:
+                cleaned_lotterys = get_lottery_pool_list(self.current_pool_name)
+                history_data = get_lottery_history_data(self.current_pool_name)
 
-            lotterys_data = get_lottery_prize_stats_data(
-                cleaned_lotterys, history_data, lottery_name, self.current_subject
-            )
+                lotterys_data = get_lottery_prize_stats_data(
+                    cleaned_lotterys, history_data, lottery_name, self.current_subject
+                )
 
-            self.has_class_record = any(
-                lottery.get("class_name", "") for lottery in lotterys_data
-            )
+                self.has_class_record = any(
+                    lottery.get("class_name", "") for lottery in lotterys_data
+                )
 
-            self.update_table_headers()
+                self.update_table_headers()
 
-            format_weight, _, _ = format_weight_for_display(lotterys_data, "weight")
+                format_weight, _, _ = format_weight_for_display(lotterys_data, "weight")
 
-            if self.sort_column >= 0:
+                if self.sort_column >= 0:
 
-                def sort_key(lottery):
-                    if self.sort_column == 0:
-                        return lottery.get("draw_time", "")
-                    elif self.sort_column == 1:
-                        return int(lottery.get("draw_lottery_numbers", 0))
-                    elif self.sort_column == 2:
-                        return lottery.get("class_name", "")
-                    elif self.sort_column == 3:
-                        return float(lottery.get("weight", ""))
-                    return ""
+                    def sort_key(lottery):
+                        if self.sort_column == 0:
+                            return lottery.get("draw_time", "")
+                        elif self.sort_column == 1:
+                            return int(lottery.get("draw_lottery_numbers", 0))
+                        elif self.sort_column == 2:
+                            return lottery.get("class_name", "")
+                        elif self.sort_column == 3:
+                            return float(lottery.get("weight", ""))
+                        return ""
 
-                reverse_order = self.sort_order == Qt.SortOrder.DescendingOrder
-                lotterys_data.sort(key=sort_key, reverse=reverse_order)
+                    reverse_order = self.sort_order == Qt.SortOrder.DescendingOrder
+                    lotterys_data.sort(key=sort_key, reverse=reverse_order)
+                else:
+                    lotterys_data.sort(
+                        key=lambda x: x.get("draw_time", ""), reverse=True
+                    )
+
+                # 缓存排序后的数据
+                self.cached_stats_data = lotterys_data
+                self.cached_stats_format_weight = format_weight
             else:
-                lotterys_data.sort(key=lambda x: x.get("draw_time", ""), reverse=True)
+                # 使用缓存的数据
+                lotterys_data = self.cached_stats_data
+                format_weight = self.cached_stats_format_weight
 
             start_row = self.current_row
             end_row = min(start_row + self.batch_size, self.total_rows)
@@ -679,6 +721,7 @@ class lottery_history_table(GroupHeaderCardWidget):
         self.current_row = 0
         self.is_loading = False
         self.table.setRowCount(0)
+        self.table.setSortingEnabled(False)
         self.table.blockSignals(True)
 
         try:

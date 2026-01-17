@@ -6,10 +6,10 @@ import colorsys
 import weakref
 from loguru import logger
 
-from PySide6.QtWidgets import QWidget, QHBoxLayout, QVBoxLayout, QMenu, QApplication
-from PySide6.QtGui import QMouseEvent, QPalette
+from PySide6.QtWidgets import QWidget, QHBoxLayout, QVBoxLayout, QMenu
+from PySide6.QtGui import QMouseEvent
 from PySide6.QtCore import Qt, QPoint, QTimer, QEvent
-from qfluentwidgets import BodyLabel, AvatarWidget, qconfig, Theme
+from qfluentwidgets import BodyLabel, AvatarWidget, qconfig
 
 from app.tools.variable import (
     STUDENT_ID_FORMAT,
@@ -28,7 +28,6 @@ from app.tools.variable import (
     LIGHT_THEME_ADJUSTED_MAX_VALUE,
     DARK_THEME_MIN_VALUE,
     DARK_THEME_MAX_VALUE,
-    LIGHTNESS_THRESHOLD,
     RGB_COLOR_FORMAT,
     GRID_ITEM_MARGIN,
     GRID_ITEM_SPACING,
@@ -339,6 +338,22 @@ class ResultDisplayUtils:
         return container
 
     @staticmethod
+    def _get_style_color(animation_color, fixed_color):
+        """获取样式颜色"""
+        if animation_color == 1:
+            return ResultDisplayUtils._generate_vibrant_color()
+        elif animation_color == 2:
+            return fixed_color
+        else:
+            try:
+                from app.tools.personalised import is_dark_theme
+                from qfluentwidgets import qconfig
+
+                return "#ffffff" if is_dark_theme(qconfig) else "#000000"
+            except Exception:
+                return "#000000"
+
+    @staticmethod
     def _apply_label_style(
         label,
         font_size,
@@ -367,6 +382,12 @@ class ResultDisplayUtils:
             custom_font = custom_font_family
 
         fixed_color = readme_settings_async(settings_group, "animation_fixed_color")
+        color_str = ResultDisplayUtils._get_style_color(animation_color, fixed_color)
+
+        style_sheet = f"font-size: {font_size}pt; color: {color_str} !important;"
+        if custom_font and use_global_font == 1:
+            style_sheet = f"font-family: '{custom_font}'; {style_sheet}"
+
         if (
             isinstance(label, QWidget)
             and hasattr(label, "layout")
@@ -379,52 +400,19 @@ class ResultDisplayUtils:
                     widget = item.widget()
                     if isinstance(widget, BodyLabel):
                         widget.setAlignment(Qt.AlignmentFlag.AlignCenter)
-                        if custom_font and use_global_font == 1:
-                            style_sheet = f"font-family: '{custom_font}'; font-size: {font_size}pt; "
-                        else:
-                            style_sheet = f"font-size: {font_size}pt; "
-
-                        if animation_color == 1:
-                            style_sheet += f"color: {ResultDisplayUtils._generate_vibrant_color()} !important;"
-                        elif animation_color == 2:
-                            style_sheet += f"color: {fixed_color} !important;"
-                        else:
-                            try:
-                                from qfluentwidgets import qconfig
-
-                                default_color = (
-                                    "#ffffff" if is_dark_theme(qconfig) else "#000000"
-                                )
-                                style_sheet += f"color: {default_color} !important;"
-                            except Exception:
-                                style_sheet += "color: #000000 !important;"
-
                         widget.setStyleSheet(style_sheet)
         else:
             label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-            if custom_font and use_global_font == 1:
-                style_sheet = (
-                    f"font-family: '{custom_font}'; font-size: {font_size}pt; "
-                )
-            else:
-                style_sheet = f"font-size: {font_size}pt; "
-
-            if animation_color == 1:
-                style_sheet += (
-                    f"color: {ResultDisplayUtils._generate_vibrant_color()} !important;"
-                )
-            elif animation_color == 2:
-                style_sheet += f"color: {fixed_color} !important;"
-            else:
-                try:
-                    from qfluentwidgets import qconfig
-
-                    default_color = "#ffffff" if is_dark_theme(qconfig) else "#000000"
-                    style_sheet += f"color: {default_color} !important;"
-                except Exception:
-                    style_sheet += "color: #000000 !important;"
-
             label.setStyleSheet(style_sheet)
+
+    @staticmethod
+    def _find_student_image(image_dir, image_name):
+        """查找学生图片"""
+        for ext in SUPPORTED_IMAGE_EXTENSIONS:
+            path = get_data_path("images", f"{image_dir}/{image_name}{ext}")
+            if file_exists(path):
+                return str(path)
+        return None
 
     @staticmethod
     def create_student_label(
@@ -465,34 +453,24 @@ class ResultDisplayUtils:
             )
             return []
 
-        student_labels = []
-
-        # 内存优化：预分配列表容量
         student_labels = [None] * len(selected_students)
+
+        # 确定图片目录
+        image_dir = (
+            "prize_images" if settings_group == "lottery_settings" else "student_images"
+        )
 
         for i, (num, selected, exist) in enumerate(selected_students):
             current_image_path = None
-            # 根据settings_group确定图片目录
             if show_student_image:
                 image_name = str(selected)
-                # 根据settings_group选择不同的图片目录
                 if settings_group == "lottery_settings":
-                    image_dir = "prize_images"
-                else:
-                    image_dir = "student_images"
-
-                # 内存优化：使用生成器表达式减少内存分配
-                for ext in (
-                    ext
-                    for ext in SUPPORTED_IMAGE_EXTENSIONS
-                    if file_exists(
-                        get_data_path("images", f"{image_dir}/{image_name}{ext}")
+                    image_name = (
+                        image_name.splitlines()[0] if image_name else image_name
                     )
-                ):
-                    current_image_path = str(
-                        get_data_path("images", f"{image_dir}/{image_name}{ext}")
-                    )
-                    break
+                current_image_path = ResultDisplayUtils._find_student_image(
+                    image_dir, image_name
+                )
 
             # 处理学号格式化
             student_id_str = (
@@ -584,37 +562,21 @@ class ResultDisplayUtils:
             for key in keys_to_remove:
                 ResultDisplayUtils._color_cache.pop(key, None)
 
-        if qconfig.theme == Theme.LIGHT:  # 浅色主题
-            adjusted_min_value = min(
-                min_value * LIGHT_VALUE_MULTIPLIER, LIGHT_THEME_MAX_VALUE
-            )
-            adjusted_max_value = min(
-                max_value * LIGHT_MAX_VALUE_MULTIPLIER, LIGHT_THEME_ADJUSTED_MAX_VALUE
-            )
-        elif qconfig.theme == Theme.AUTO:  # 自动主题
-            lightness = QApplication.palette().color(QPalette.Window).lightness()
-            if lightness > LIGHTNESS_THRESHOLD:  # 浅色主题
-                adjusted_min_value = min(
-                    min_value * LIGHT_VALUE_MULTIPLIER, LIGHT_THEME_MAX_VALUE
-                )
-                adjusted_max_value = min(
-                    max_value * LIGHT_MAX_VALUE_MULTIPLIER,
-                    LIGHT_THEME_ADJUSTED_MAX_VALUE,
-                )
-            else:  # 深色主题
-                adjusted_min_value = min(
-                    min_value * DARK_VALUE_MULTIPLIER, DARK_THEME_MIN_VALUE
-                )
-                adjusted_max_value = max(
-                    max_value * DARK_MAX_VALUE_MULTIPLIER, DARK_THEME_MAX_VALUE
-                )
-        else:  # 深色主题或其他主题
+        if is_dark_theme(qconfig):  # 深色主题
             adjusted_min_value = min(
                 min_value * DARK_VALUE_MULTIPLIER, DARK_THEME_MIN_VALUE
             )
             adjusted_max_value = max(
                 max_value * DARK_MAX_VALUE_MULTIPLIER, DARK_THEME_MAX_VALUE
             )
+        else:  # 浅色主题
+            adjusted_min_value = min(
+                min_value * LIGHT_VALUE_MULTIPLIER, LIGHT_THEME_MAX_VALUE
+            )
+            adjusted_max_value = min(
+                max_value * LIGHT_MAX_VALUE_MULTIPLIER, LIGHT_THEME_ADJUSTED_MAX_VALUE
+            )
+
         h = random.random()
         s = random.uniform(min_saturation, max_saturation)
         v = random.uniform(adjusted_min_value, adjusted_max_value)

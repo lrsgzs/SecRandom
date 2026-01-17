@@ -242,6 +242,8 @@ def show_notification(
     Returns:
         InfoBar实例
     """
+    if parent is not None and not isinstance(parent, QWidget):
+        parent = None
     type_handlers = {
         NotificationType.SUCCESS: lambda: InfoBar.success(
             title=config.title,
@@ -607,15 +609,14 @@ def _get_operating_system() -> str:
     """获取操作系统信息，特别优化Win11识别"""
     if sys.platform == "win32":
         try:
-            version = platform.version()
+            version = sys.getwindowsversion()
             release = platform.release()
 
-            if release == "10":
-                build_number = int(version.split(".")[2])
-                if build_number >= 22000:
-                    return f"Windows 11 (Build {build_number})"
+            # Windows 11 Build number starts from 22000
+            if version.build >= 22000:
+                return f"Windows 11 (Build {version.build})"
 
-            return f"Windows {release} (Build {version})"
+            return f"Windows {release} (Build {platform.version()})"
         except Exception:
             return f"Windows ({platform.system()})"
     else:
@@ -1742,42 +1743,8 @@ def read_drawn_record(class_name: str, gender: str, group: str) -> list:
         已抽取记录列表，每个元素为(名称, 次数)元组
     """
     file_path = get_data_path("TEMP", f"draw_until_{class_name}_{gender}_{group}.json")
-    if os.path.exists(file_path):
-        try:
-            with open(file_path, "r", encoding="utf-8") as file:
-                data = json.load(file)
-
-            if isinstance(data, dict):
-                return [(name, count) for name, count in data.items()]
-            elif isinstance(data, list):
-                drawn_records = []
-                for item in data:
-                    if isinstance(item, str):
-                        drawn_records.append((item, 1))
-                    elif isinstance(item, dict) and "name" in item:
-                        name = item["name"]
-                        count = item.get("count", 1)
-                        drawn_records.append((name, count))
-                return drawn_records
-            elif isinstance(data, dict) and "drawn_names" in data:
-                drawn_records = []
-                for item in data["drawn_names"]:
-                    if isinstance(item, str):
-                        drawn_records.append((item, 1))
-                    elif isinstance(item, dict) and "name" in item:
-                        name = item["name"]
-                        count = item.get("count", 1)
-                        drawn_records.append((name, count))
-                return drawn_records
-            else:
-                return []
-
-        except (json.JSONDecodeError, IOError) as e:
-            logger.exception(f"读取已抽取记录失败: {e}")
-            return []
-    else:
-        logger.debug(f"文件 {file_path} 不存在")
-        return []
+    drawn_records = _load_drawn_records(file_path)
+    return list(drawn_records.items())
 
 
 def remove_record(class_name: str, gender: str, group: str, _prefix: str = "0") -> None:
@@ -1795,39 +1762,29 @@ def remove_record(class_name: str, gender: str, group: str, _prefix: str = "0") 
 
     logger.debug(f"清除记录前缀: {prefix}, _prefix: {_prefix}")
 
-    if prefix == "all":
-        search_pattern = os.path.join(
-            "data", "TEMP", f"draw_*_{class_name}_{gender}_{group}.json"
-        )
-        file_list = glob.glob(search_pattern)
-        for file_path in file_list:
-            try:
-                os.remove(file_path)
-                file_name = os.path.basename(os.path.dirname(file_path))
-                logger.info(f"已删除记录文件夹: {file_name}")
-            except OSError as e:
-                logger.exception(f"删除文件{file_path}失败: {e}")
-    elif prefix == "until":
-        file_path = get_data_path(
-            "TEMP", f"draw_{prefix}_{class_name}_{gender}_{group}.json"
-        )
-        try:
-            if os.path.exists(file_path):
-                os.remove(file_path)
-                file_name = os.path.basename(os.path.dirname(file_path))
-                logger.info(f"已删除记录文件夹: {file_name}")
-        except OSError as e:
-            logger.exception(f"删除文件{file_path}失败: {e}")
-    elif prefix == "restart":
-        search_pattern = os.path.join("data", "TEMP", "draw_*.json")
-        file_list = glob.glob(search_pattern)
-        for file_path in file_list:
-            try:
-                os.remove(file_path)
-                file_name = os.path.basename(os.path.dirname(file_path))
-                logger.info(f"已删除记录文件夹: {file_name}")
-            except OSError as e:
-                logger.exception(f"删除文件{file_path}失败: {e}")
+    temp_dir = get_data_path("TEMP")
+    if not temp_dir.exists():
+        return
+
+    try:
+        if prefix == "all":
+            pattern = f"draw_*_{class_name}_{gender}_{group}.json"
+            for file_path in temp_dir.glob(pattern):
+                file_path.unlink(missing_ok=True)
+                logger.info(f"已删除记录文件: {file_path.name}")
+        elif prefix == "until":
+            file_name = f"draw_{prefix}_{class_name}_{gender}_{group}.json"
+            file_path = temp_dir / file_name
+            if file_path.exists():
+                file_path.unlink()
+                logger.info(f"已删除记录文件: {file_name}")
+        elif prefix == "restart":
+            pattern = "draw_*.json"
+            for file_path in temp_dir.glob(pattern):
+                file_path.unlink(missing_ok=True)
+                logger.info(f"已删除记录文件: {file_path.name}")
+    except OSError as e:
+        logger.exception(f"删除记录文件失败: {e}")
 
 
 def reset_drawn_record(self, class_name: str, gender: str, group: str) -> None:
@@ -1978,12 +1935,14 @@ def read_drawn_record_simple(pool_name: str) -> list:
     return []
 
 
-def reset_drawn_prize_record(self, pool_name: str) -> None:
-    """重置奖池抽取记录
+def delete_drawn_prize_record_files(pool_name: str) -> bool:
+    """删除奖池抽取记录文件
 
     Args:
-        self: 父窗口组件
         pool_name: 奖池名称
+
+    Returns:
+        bool: 是否成功删除
     """
     try:
         pattern = os.path.join("data", "TEMP", f"draw_*_prize_{pool_name}.json")
@@ -1992,6 +1951,20 @@ def reset_drawn_prize_record(self, pool_name: str) -> None:
                 os.remove(fp)
             except OSError as e:
                 logger.error(f"删除文件{fp}失败: {e}")
+        return True
+    except Exception as e:
+        logger.exception(f"重置奖池抽取记录失败: {e}")
+        return False
+
+
+def reset_drawn_prize_record(self, pool_name: str) -> None:
+    """重置奖池抽取记录
+
+    Args:
+        self: 父窗口组件
+        pool_name: 奖池名称
+    """
+    if delete_drawn_prize_record_files(pool_name):
         show_notification(
             NotificationType.INFO,
             NotificationConfig(
@@ -2001,5 +1974,3 @@ def reset_drawn_prize_record(self, pool_name: str) -> None:
             ),
             parent=self,
         )
-    except Exception as e:
-        logger.exception(f"重置奖池抽取记录失败: {e}")

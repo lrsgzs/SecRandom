@@ -12,6 +12,9 @@ from app.tools.settings_access import *
 from app.common.music.music_player import music_player
 from app.common.roll_call.roll_call_utils import RollCallUtils
 from app.Language.obtain_language import get_content_combo_name_async
+from qfluentwidgets import FluentIcon
+from app.tools.config import show_notification, NotificationType, NotificationConfig
+from app.tools.personalised import get_theme_icon
 
 
 # ==================================================
@@ -61,6 +64,16 @@ class QuickDrawAnimation(QObject):
         current_count = readme_settings_async("quick_draw_settings", "draw_count")
         half_repeat = readme_settings_async("quick_draw_settings", "half_repeat")
 
+        # 加载数据到管理器
+        self.roll_call_widget.manager.load_data(
+            class_name,
+            group_filter,
+            gender_filter,
+            group_index,
+            gender_index,
+            half_repeat,
+        )
+
         animation_music = readme_settings_async(
             "quick_draw_settings", "animation_music"
         )
@@ -100,6 +113,65 @@ class QuickDrawAnimation(QObject):
         logger.debug("stop_animation: 停止闪抽动画")
         self.is_animating = False
         self.roll_call_widget.is_quick_draw = False
+
+        # 执行最终抽取
+        current_count = readme_settings_async("quick_draw_settings", "draw_count")
+        result = self.roll_call_widget.manager.draw_final_students(current_count)
+
+        if "reset_required" in result and result["reset_required"]:
+            class_name = readme_settings_async("quick_draw_settings", "default_class")
+            group_index = 0
+            group_filter = get_content_combo_name_async("roll_call", "range_combobox")[
+                group_index
+            ]
+            gender_index = 0
+            gender_filter = get_content_combo_name_async(
+                "roll_call", "gender_combobox"
+            )[gender_index]
+
+            self.roll_call_widget.manager.current_class_name = class_name
+            self.roll_call_widget.manager.current_gender_filter = gender_filter
+            self.roll_call_widget.manager.current_group_filter = group_filter
+            self.roll_call_widget.manager.reset_records()
+
+            clear_record = readme_settings_async("roll_call_settings", "clear_record")
+            if clear_record in [0, 1]:
+                show_notification(
+                    NotificationType.INFO,
+                    NotificationConfig(
+                        title="提示",
+                        content=f"已重置{class_name}已抽取记录",
+                        icon=FluentIcon.INFO,
+                    ),
+                    parent=self.roll_call_widget,
+                )
+            else:
+                show_notification(
+                    NotificationType.INFO,
+                    NotificationConfig(
+                        title="提示",
+                        content=f"当前处于重复抽取状态，无需清除{class_name}已抽取记录",
+                        icon=get_theme_icon("ic_fluent_warning_20_filled"),
+                    ),
+                    parent=self.roll_call_widget,
+                )
+            # Reset handling - might need to abort or clear result
+            self.final_selected_students = []
+        else:
+            self.final_selected_students = result["selected_students"]
+            self.final_class_name = result["class_name"]
+            self.final_selected_students_dict = result["selected_students_dict"]
+            self.final_group_filter = result["group_filter"]
+            self.final_gender_filter = result["gender_filter"]
+
+            # Sync with widget
+            self.roll_call_widget.final_selected_students = self.final_selected_students
+            self.roll_call_widget.final_class_name = self.final_class_name
+            self.roll_call_widget.final_selected_students_dict = (
+                self.final_selected_students_dict
+            )
+            self.roll_call_widget.final_group_filter = self.final_group_filter
+            self.roll_call_widget.final_gender_filter = self.final_gender_filter
 
         from app.common.behind_scenes.behind_scenes_utils import BehindScenesUtils
 
@@ -183,48 +255,78 @@ class QuickDrawAnimation(QObject):
             self.stop_animation()
             return False
 
-        group_index = 0
-        group_filter = get_content_combo_name_async("roll_call", "range_combobox")[
-            group_index
-        ]
-        gender_index = 0
-        gender_filter = get_content_combo_name_async("roll_call", "gender_combobox")[
-            gender_index
-        ]
         current_count = readme_settings_async("quick_draw_settings", "draw_count")
-        half_repeat = readme_settings_async("quick_draw_settings", "half_repeat")
 
-        result = RollCallUtils.draw_random_students(
-            class_name,
-            group_index,
-            group_filter,
-            gender_index,
-            gender_filter,
-            current_count,
-            half_repeat,
-        )
+        if self.is_animating:
+            # 动画过程中，使用管理器快速获取随机学生
+            students = self.roll_call_widget.manager.get_random_students(current_count)
 
-        if "reset_required" in result and result["reset_required"]:
-            RollCallUtils.reset_drawn_records(
-                self.roll_call_widget, class_name, gender_filter, group_filter
+            selected_students = []
+            for s in students:
+                # s 是 [id, name, gender, group, exist]
+                exist = s[4] if len(s) > 4 else True
+                selected_students.append((s[0], s[1], exist))
+
+            self.final_selected_students = selected_students
+            self.final_class_name = self.roll_call_widget.manager.current_class_name
+        else:
+            # 非动画状态（直接抽取），执行最终抽取
+            result = self.roll_call_widget.manager.draw_final_students(current_count)
+
+            if "reset_required" in result and result["reset_required"]:
+                group_index = 0
+                group_filter = get_content_combo_name_async(
+                    "roll_call", "range_combobox"
+                )[group_index]
+                gender_index = 0
+                gender_filter = get_content_combo_name_async(
+                    "roll_call", "gender_combobox"
+                )[gender_index]
+
+                self.roll_call_widget.manager.current_class_name = class_name
+                self.roll_call_widget.manager.current_gender_filter = gender_filter
+                self.roll_call_widget.manager.current_group_filter = group_filter
+                self.roll_call_widget.manager.reset_records()
+
+                clear_record = readme_settings_async(
+                    "roll_call_settings", "clear_record"
+                )
+                if clear_record in [0, 1]:
+                    show_notification(
+                        NotificationType.INFO,
+                        NotificationConfig(
+                            title="提示",
+                            content=f"已重置{class_name}已抽取记录",
+                            icon=FluentIcon.INFO,
+                        ),
+                        parent=self.roll_call_widget,
+                    )
+                else:
+                    show_notification(
+                        NotificationType.INFO,
+                        NotificationConfig(
+                            title="提示",
+                            content=f"当前处于重复抽取状态，无需清除{class_name}已抽取记录",
+                            icon=get_theme_icon("ic_fluent_warning_20_filled"),
+                        ),
+                        parent=self.roll_call_widget,
+                    )
+                return False
+
+            self.final_selected_students = result["selected_students"]
+            self.final_class_name = result["class_name"]
+            self.final_selected_students_dict = result["selected_students_dict"]
+            self.final_group_filter = result["group_filter"]
+            self.final_gender_filter = result["gender_filter"]
+
+            # 同时更新roll_call_widget的结果（用于显示）
+            self.roll_call_widget.final_selected_students = self.final_selected_students
+            self.roll_call_widget.final_class_name = self.final_class_name
+            self.roll_call_widget.final_selected_students_dict = (
+                self.final_selected_students_dict
             )
-            return False
-
-        # 保存抽取结果
-        self.final_selected_students = result["selected_students"]
-        self.final_class_name = result["class_name"]
-        self.final_selected_students_dict = result["selected_students_dict"]
-        self.final_group_filter = result["group_filter"]
-        self.final_gender_filter = result["gender_filter"]
-
-        # 同时更新roll_call_widget的结果（用于显示）
-        self.roll_call_widget.final_selected_students = self.final_selected_students
-        self.roll_call_widget.final_class_name = self.final_class_name
-        self.roll_call_widget.final_selected_students_dict = (
-            self.final_selected_students_dict
-        )
-        self.roll_call_widget.final_group_filter = self.final_group_filter
-        self.roll_call_widget.final_gender_filter = self.final_gender_filter
+            self.roll_call_widget.final_group_filter = self.final_group_filter
+            self.roll_call_widget.final_gender_filter = self.final_gender_filter
 
         return True
 

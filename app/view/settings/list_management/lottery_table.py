@@ -209,7 +209,7 @@ class lottery_table(GroupHeaderCardWidget):
 
         try:
             # 获取抽奖池数据
-            pool = get_pool_data(pool_name)
+            pool = get_pool_list(pool_name)
             if not pool:
                 self.table.setRowCount(0)
                 return

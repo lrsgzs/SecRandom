@@ -1,7 +1,6 @@
 # ==================================================
 # 点名工具类
 # ==================================================
-import json
 from random import SystemRandom
 
 from app.common.data.list import get_group_list, get_student_list, filter_students_data
@@ -14,7 +13,6 @@ from app.tools.config import (
     reset_drawn_record,
     record_drawn_student,
 )
-from app.tools.path_utils import get_data_path, open_file
 from app.tools.settings_access import readme_settings_async, get_safe_font_size
 from app.common.display.result_display import ResultDisplayUtils
 from app.common.history import save_roll_call_history
@@ -153,6 +151,115 @@ class RollCallUtils:
         return total_count, remaining_count, formatted_text
 
     @staticmethod
+    def _get_filtered_candidates(
+        class_name, group_index, group_filter, gender_index, gender_filter
+    ):
+        """获取并过滤候选人列表"""
+        cache_key = (
+            f"{class_name}_{group_index}_{group_filter}_{gender_index}_{gender_filter}"
+        )
+
+        if cache_key not in RollCallUtils._student_data_cache:
+            # 使用 get_student_list 获取处理好的学生列表（List[Dict]），而不是直接加载原始JSON
+            raw_students = get_student_list(class_name)
+
+            students_data = filter_students_data(
+                raw_students, group_index, group_filter, gender_index, gender_filter
+            )
+
+            RollCallUtils._student_data_cache[cache_key] = students_data
+        else:
+            students_data = RollCallUtils._student_data_cache[cache_key]
+
+        students_dict_list = []
+        if group_index == 1:
+            students_data = sorted(students_data, key=lambda x: x[3])
+
+        for student_tuple in students_data:
+            student_dict = {
+                "id": student_tuple[0],
+                "name": student_tuple[1],
+                "gender": student_tuple[2],
+                "group": student_tuple[3],
+                "exist": student_tuple[4],
+            }
+            students_dict_list.append(student_dict)
+
+        return students_dict_list
+
+    @staticmethod
+    def _apply_history_filter(
+        students_dict_list, half_repeat, class_name, gender_filter, group_filter
+    ):
+        """应用历史记录过滤（半重复模式）"""
+        if half_repeat <= 0:
+            return students_dict_list
+
+        record_key = f"{class_name}_{gender_filter}_{group_filter}"
+        if record_key not in RollCallUtils._drawn_record_cache:
+            drawn_records = read_drawn_record(class_name, gender_filter, group_filter)
+            RollCallUtils._drawn_record_cache[record_key] = drawn_records
+        else:
+            drawn_records = RollCallUtils._drawn_record_cache[record_key]
+
+        drawn_counts = {name: count for name, count in drawn_records}
+
+        filtered_list = []
+        for item in students_dict_list:
+            name = item["name"]
+            if name not in drawn_counts or drawn_counts[name] < half_repeat:
+                filtered_list.append(item)
+
+        return filtered_list
+
+    @staticmethod
+    def _perform_weighted_draw(candidates, count, weights=None):
+        """执行加权或随机抽取"""
+        draw_count = min(count, len(candidates))
+        selected_candidates = []
+        selected_candidates_dict = []
+
+        # Create a copy to avoid modifying the original list if it's used elsewhere
+        candidates = list(candidates)
+
+        # If weights are provided, ensure they match the candidates length
+        current_weights = list(weights) if weights else [1.0] * len(candidates)
+
+        for _ in range(draw_count):
+            if not candidates:
+                break
+
+            total_weight = sum(current_weights)
+            if total_weight <= 0:
+                random_index = system_random.randint(0, len(candidates) - 1)
+            else:
+                rand_value = system_random.uniform(0, total_weight)
+                cumulative_weight = 0
+                random_index = 0
+                for i, weight in enumerate(current_weights):
+                    cumulative_weight += weight
+                    if rand_value <= cumulative_weight:
+                        random_index = i
+                        break
+
+            selected_candidate = candidates[random_index]
+
+            # Extract basic info tuple
+            info_tuple = (
+                selected_candidate.get("id", ""),
+                selected_candidate.get("name", ""),
+                selected_candidate.get("exist", True),
+            )
+
+            selected_candidates.append(info_tuple)
+            selected_candidates_dict.append(selected_candidate)
+
+            candidates.pop(random_index)
+            current_weights.pop(random_index)
+
+        return selected_candidates, selected_candidates_dict
+
+    @staticmethod
     def draw_random_students(
         class_name,
         group_index,
@@ -164,81 +271,26 @@ class RollCallUtils:
     ):
         """
         抽取随机学生
-
-        Args:
-            class_name: 班级名称
-            group_index: 小组索引
-            group_filter: 小组过滤器
-            gender_index: 性别索引
-            gender_filter: 性别过滤器
-            current_count: 当前抽取数量
-            half_repeat: 半重复设置
-
-        Returns:
-            dict: 包含抽取结果的字典
         """
-        cache_key = (
-            f"{class_name}_{group_index}_{group_filter}_{gender_index}_{gender_filter}"
+        # 1. 获取候选人
+        students_dict_list = RollCallUtils._get_filtered_candidates(
+            class_name, group_index, group_filter, gender_index, gender_filter
         )
 
-        if cache_key not in RollCallUtils._student_data_cache:
-            student_file = get_data_path("list/roll_call_list", f"{class_name}.json")
-            with open_file(student_file, "r", encoding="utf-8") as f:
-                data = json.load(f)
+        # 2. 应用历史记录过滤
+        students_dict_list = RollCallUtils._apply_history_filter(
+            students_dict_list, half_repeat, class_name, gender_filter, group_filter
+        )
 
-            students_data = filter_students_data(
-                data, group_index, group_filter, gender_index, gender_filter
-            )
+        if not students_dict_list:
+            return {"reset_required": True}
 
-            RollCallUtils._student_data_cache[cache_key] = students_data
-        else:
-            students_data = RollCallUtils._student_data_cache[cache_key]
-
+        # 3. 如果是小组模式，直接抽取小组
         if group_index == 1:
-            students_data = sorted(students_data, key=lambda x: x[3])
-
-            students_dict_list = []
-            for student_tuple in students_data:
-                student_dict = {
-                    "id": student_tuple[0],
-                    "name": student_tuple[1],
-                    "gender": student_tuple[2],
-                    "group": student_tuple[3],
-                    "exist": student_tuple[4],
-                }
-                students_dict_list.append(student_dict)
-
-            if half_repeat > 0:
-                record_key = f"{class_name}_{gender_filter}_{group_filter}"
-                if record_key not in RollCallUtils._drawn_record_cache:
-                    drawn_records = read_drawn_record(
-                        class_name, gender_filter, group_filter
-                    )
-                    RollCallUtils._drawn_record_cache[record_key] = drawn_records
-                else:
-                    drawn_records = RollCallUtils._drawn_record_cache[record_key]
-
-                drawn_counts = {name: count for name, count in drawn_records}
-
-                filtered_groups = []
-                for group in students_dict_list:
-                    group_name = group["name"]
-                    if (
-                        group_name not in drawn_counts
-                        or drawn_counts[group_name] < half_repeat
-                    ):
-                        filtered_groups.append(group)
-
-                students_dict_list = filtered_groups
-
-            if not students_dict_list:
-                return {"reset_required": True}
-
             draw_type = readme_settings_async("roll_call_settings", "draw_type")
             selected_groups = RollCallUtils.draw_random_groups(
                 students_dict_list, current_count, draw_type
             )
-
             return {
                 "selected_students": selected_groups,
                 "class_name": class_name,
@@ -247,44 +299,7 @@ class RollCallUtils:
                 "gender_filter": gender_filter,
             }
 
-        students_dict_list = []
-        for student_tuple in students_data:
-            student_dict = {
-                "id": student_tuple[0],
-                "name": student_tuple[1],
-                "gender": student_tuple[2],
-                "group": student_tuple[3],
-                "exist": student_tuple[4],
-            }
-            students_dict_list.append(student_dict)
-
-        if half_repeat > 0:
-            record_key = f"{class_name}_{gender_filter}_{group_filter}"
-            if record_key not in RollCallUtils._drawn_record_cache:
-                drawn_records = read_drawn_record(
-                    class_name, gender_filter, group_filter
-                )
-                RollCallUtils._drawn_record_cache[record_key] = drawn_records
-            else:
-                drawn_records = RollCallUtils._drawn_record_cache[record_key]
-
-            drawn_counts = {name: count for name, count in drawn_records}
-
-            filtered_students = []
-            for student in students_dict_list:
-                student_name = student["name"]
-                if (
-                    student_name not in drawn_counts
-                    or drawn_counts[student_name] < half_repeat
-                ):
-                    filtered_students.append(student)
-
-            students_dict_list = filtered_students
-
-        if not students_dict_list:
-            return {"reset_required": True}
-
-        # 获取当前课程信息（用于科目过滤）
+        # 4. 获取当前课程信息（用于科目过滤）
         current_class_info = None
         subject_history_filter_enabled = (
             readme_settings_async("linkage_settings", "subject_history_filter_enabled")
@@ -301,102 +316,66 @@ class RollCallUtils:
                 )
             elif data_source == 1:
                 current_class_info = _get_current_class_info()
-            else:
-                current_class_info = None
 
-            # 如果当前没有课程信息（课间时段），则使用课间归属的课程信息
-            if not current_class_info:
-                if _is_non_class_time():
-                    current_class_info = _get_break_assignment_class_info()
+            if not current_class_info and _is_non_class_time():
+                current_class_info = _get_break_assignment_class_info()
 
-        # 提取科目名称
-        subject_filter = ""
-        if current_class_info:
-            subject_filter = current_class_info.get("name", "")
+        subject_filter = (
+            current_class_info.get("name", "") if current_class_info else ""
+        )
 
+        # 5. 应用平均间隔保护
         students_dict_list = apply_avg_gap_protection(
             students_dict_list, current_count, class_name, "roll_call", subject_filter
         )
 
+        # 6. 应用内幕权重
         students_dict_list, behind_scenes_weights = (
             BehindScenesUtils.apply_probability_weights(
                 students_dict_list, 0, class_name
             )
         )
 
-        # 检查是否有必中人员
+        # 7. 检查必中人员
         guaranteed_students = BehindScenesUtils.ensure_guaranteed_selection(
             students_dict_list, behind_scenes_weights, class_name
         )
         if guaranteed_students is not None:
-            # 存在必中人员，直接返回
-            selected_students = []
-            selected_students_dict = []
-            for student in guaranteed_students:
-                selected_students.append(
-                    (
-                        student.get("id", ""),
-                        student.get("name", ""),
-                        student.get("exist", True),
-                    )
-                )
-                selected_students_dict.append(student)
-
+            selected_students = [
+                (s.get("id", ""), s.get("name", ""), s.get("exist", True))
+                for s in guaranteed_students
+            ]
             return {
                 "selected_students": selected_students,
                 "class_name": class_name,
-                "selected_students_dict": selected_students_dict,
+                "selected_students_dict": guaranteed_students,
                 "group_filter": group_filter,
                 "gender_filter": gender_filter,
             }
 
+        # 8. 计算最终权重
         draw_type = readme_settings_async("roll_call_settings", "draw_type")
+        weights = []
         if draw_type == 1:
             students_with_weight = calculate_weight(
                 students_dict_list, class_name, subject_filter
             )
-            weights = []
+            # 重新对齐权重列表（students_with_weight 和 behind_scenes_weights 应该是一一对应的）
             for i, student in enumerate(students_with_weight):
-                # 结合内幕权重和历史权重
                 base_weight = student.get("weight", 1.0)
-                behind_scenes_weight = (
+                bs_weight = (
                     behind_scenes_weights[i] if i < len(behind_scenes_weights) else 1.0
                 )
-                weights.append(base_weight * behind_scenes_weight)
+                weights.append(base_weight * bs_weight)
+            candidates = students_with_weight
         else:
-            students_with_weight = students_dict_list
+            candidates = students_dict_list
             weights = behind_scenes_weights
 
-        draw_count = current_count
-        draw_count = min(draw_count, len(students_with_weight))
-
-        selected_students = []
-        selected_students_dict = []
-        for _ in range(draw_count):
-            if not students_with_weight:
-                break
-            total_weight = sum(weights)
-            if total_weight <= 0:
-                random_index = system_random.randint(0, len(students_with_weight) - 1)
-            else:
-                rand_value = system_random.uniform(0, total_weight)
-                cumulative_weight = 0
-                random_index = 0
-                for i, weight in enumerate(weights):
-                    cumulative_weight += weight
-                    if rand_value <= cumulative_weight:
-                        random_index = i
-                        break
-
-            selected_student = students_with_weight[random_index]
-            id = selected_student.get("id", "")
-            random_name = selected_student.get("name", "")
-            exist = selected_student.get("exist", True)
-            selected_students.append((id, random_name, exist))
-            selected_students_dict.append(selected_student)
-
-            students_with_weight.pop(random_index)
-            weights.pop(random_index)
+        # 9. 执行抽取
+        selected_students, selected_students_dict = (
+            RollCallUtils._perform_weighted_draw(candidates, current_count, weights)
+        )
 
         return {
             "selected_students": selected_students,
@@ -410,60 +389,19 @@ class RollCallUtils:
     def draw_random_groups(students_dict_list, current_count, draw_type):
         """
         抽取随机小组
-
-        Args:
-            students_dict_list: 学生字典列表
-            current_count: 当前抽取数量
-            draw_type: 抽取类型
-
-        Returns:
-            list: 选中的小组列表
         """
-        # 小组模式下，students_data已经只包含小组信息
-        # 直接使用小组数据进行抽取
-        draw_count = min(current_count, len(students_dict_list))
+        # 小组模式下，students_dict_list已经只包含小组信息
+        # 权重抽取模式下，所有小组权重相同，所以逻辑其实是一样的
+        # 为了兼容性保留 weights 参数，但在小组模式下通常是均匀分布
 
-        selected_groups = []
-        if draw_type == 1:
-            # 权重抽取模式下，所有小组权重相同
-            weights = [1.0] * len(students_dict_list)
+        weights = [1.0] * len(students_dict_list)
 
-            # 根据权重抽取小组
-            for _ in range(draw_count):
-                if not students_dict_list:
-                    break
-                total_weight = sum(weights)
-                if total_weight <= 0:
-                    random_index = system_random.randint(0, len(students_dict_list) - 1)
-                else:
-                    rand_value = system_random.uniform(0, total_weight)
-                    cumulative_weight = 0
-                    random_index = 0
-                    for i, weight in enumerate(weights):
-                        cumulative_weight += weight
-                        if rand_value <= cumulative_weight:
-                            random_index = i
-                            break
+        selected_groups, _ = RollCallUtils._perform_weighted_draw(
+            students_dict_list, current_count, weights
+        )
 
-                selected_group = students_dict_list[random_index]
-                selected_groups.append(
-                    (None, selected_group["name"], True)
-                )  # (id, name, exist)
-
-                students_dict_list.pop(random_index)
-                weights.pop(random_index)
-        else:
-            # 随机抽取模式
-            for _ in range(draw_count):
-                if not students_dict_list:
-                    break
-                random_index = system_random.randint(0, len(students_dict_list) - 1)
-                selected_group = students_dict_list[random_index]
-                selected_groups.append(
-                    (None, selected_group["name"], True)
-                )  # (id, name, exist)
-
-                students_dict_list.pop(random_index)
+        # format: (id, name, exist) -> (None, name, True)
+        # _perform_weighted_draw already returns this format because _get_filtered_candidates sets it up
 
         return selected_groups
 

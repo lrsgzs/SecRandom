@@ -14,7 +14,6 @@ import queue
 import sys
 import threading
 import time
-from io import BytesIO
 from queue import Queue, Empty
 from typing import Any, Dict, List, Optional, Tuple, Union
 
@@ -117,15 +116,13 @@ class VoicePlaybackSystem:
                 if isinstance(task, tuple):  # 内存数据
                     data, fs = task
                     logger.debug(f"处理内存数据: 数据长度={len(data)}, 采样率={fs}")
-                    self._safe_play(data, fs)
+                    self._safe_play_memory(data, fs)
                 else:  # 文件路径
                     try:
                         logger.debug(f"处理文件路径: {task}")
-                        data, fs = sf.read(task)
-                        logger.debug(f"读取文件成功: 数据长度={len(data)}, 采样率={fs}")
-                        self._safe_play(data, fs)
+                        self._safe_play_file(task)
                     except Exception as e:
-                        logger.exception(f"读取音频文件失败: {e}", exc_info=True)
+                        logger.exception(f"播放音频文件失败: {e}", exc_info=True)
 
             except Empty:
                 # 队列为空时，短暂休息避免CPU占用过高
@@ -136,11 +133,78 @@ class VoicePlaybackSystem:
                 # 短暂休息后继续，避免异常风暴
                 time.sleep(0.5)
 
-    def _safe_play(self, data: np.ndarray, fs: int) -> None:
-        """安全播放实现
+    def _safe_play_file(self, file_path: str) -> None:
+        """流式播放音频文件（低内存占用）"""
+        stream = None
+        sf_file = None
+        try:
+            # 打开音频文件
+            sf_file = sf.SoundFile(file_path)
+            fs = sf_file.samplerate
+            channels = sf_file.channels
 
-        注意：添加了更完善的异常处理和日志，确保播放失败不会导致程序崩溃
-        """
+            # 计算语速调整因子，1.0表示正常语速
+            speed_factor: float = self._speed / 100.0
+
+            # 根据语速调整采样率
+            adjusted_fs: int = int(fs * speed_factor)
+            logger.debug(
+                f"准备播放文件：{file_path}，原始采样率={fs}，调整后采样率={adjusted_fs}，音量={self._volume}"
+            )
+
+            # 确保音频数据是单通道（如果多通道，SoundFile可以读取时自动转换，但这里我们简单处理，假设SoundDevice能处理）
+            # SoundDevice可以处理多通道，但如果需要混音，最好自己处理。
+            # 为了简单和性能，我们直接读取。如果通道数不匹配，SoundDevice会报错。
+            # 我们强制单通道播放，如果源文件是多通道，sd.OutputStream(channels=channels)即可。
+
+            # 初始化音频流
+            stream = sd.OutputStream(
+                samplerate=adjusted_fs,
+                channels=channels,
+                dtype="float32",
+                blocksize=2048,
+            )
+            stream.start()
+
+            with self._is_playing_lock:
+                self._is_playing = True
+            logger.info(f"开始播放音频文件: {os.path.basename(file_path)}")
+
+            # 分块读取并播放
+            block_size = 4096
+            for block in sf_file.blocks(
+                blocksize=block_size, dtype="float32", always_2d=True
+            ):
+                if self._stop_flag.is_set():
+                    logger.info("收到停止信号，中断播放")
+                    break
+
+                # 应用音量
+                block = block * self._volume
+
+                # 写入音频流
+                stream.write(block)
+
+            logger.info("音频播放完毕")
+            with self._is_playing_lock:
+                self._is_playing = False
+
+        except Exception as e:
+            logger.exception(f"播放文件失败: {e}", exc_info=True)
+            with self._is_playing_lock:
+                self._is_playing = False
+        finally:
+            if stream:
+                try:
+                    stream.stop()
+                    stream.close()
+                except Exception:
+                    pass
+            if sf_file:
+                sf_file.close()
+
+    def _safe_play_memory(self, data: np.ndarray, fs: int) -> None:
+        """安全播放内存数据实现"""
         stream = None
         try:
             # 计算语速调整因子，1.0表示正常语速
@@ -225,13 +289,9 @@ class VoicePlaybackSystem:
                 # 清理临时变量
                 del data
                 del fs
-                # 强制垃圾回收
-                import gc
-
-                gc.collect()
-                logger.debug("播放完成，已回收内存")
+                logger.debug("播放完成，清理临时变量")
             except Exception as e:
-                logger.exception(f"内存回收失败: {e}")
+                logger.exception(f"清理临时变量失败: {e}")
 
     def add_task(self, task: Union[Tuple[np.ndarray, int], str]) -> bool:
         """添加播放任务（线程安全）"""
@@ -289,8 +349,8 @@ class VoiceCacheManager:
         ensure_dir(self.audio_dir)
         self._disk_cache_lock: threading.Lock = threading.Lock()
 
-    def get_voice(self, text: str, voice: str) -> Tuple[np.ndarray, int]:
-        """获取语音数据（自动缓存到磁盘）"""
+    def get_voice(self, text: str, voice: str) -> str:
+        """获取语音文件路径（自动缓存到磁盘）"""
         if not isinstance(text, str) or not text:
             logger.warning(f"无效的文本: {text}")
             raise ValueError("文本不能为空")
@@ -303,18 +363,13 @@ class VoiceCacheManager:
         file_path: str = self._get_cache_file_path(text, voice)
         if os.path.exists(file_path):
             logger.debug(f"命中磁盘缓存: {file_path}")
-            try:
-                data, fs = sf.read(file_path)
-                return data, fs
-            except Exception as e:
-                logger.exception(f"读取缓存失败: {e}")
+            return file_path
 
         logger.debug(f"未命中缓存，生成新语音: {file_path}")
-        data, fs = asyncio.run(self._generate_voice(text, voice))
-        self._save_to_disk(file_path, data, fs)
-        return data, fs
+        asyncio.run(self._generate_voice(text, voice, file_path))
+        return file_path
 
-    async def _generate_voice(self, text: str, voice: str) -> Tuple[np.ndarray, int]:
+    async def _generate_voice(self, text: str, voice: str, file_path: str) -> None:
         """生成语音核心方法"""
         # 限制文本长度，防止生成过大的音频
         max_text_length = 500
@@ -328,23 +383,9 @@ class VoiceCacheManager:
         while retry_count < max_retries:
             try:
                 communicate = edge_tts.Communicate(text, voice)
-
-                audio_buffer = BytesIO()
-                audio_chunks = 0
-                async for chunk in communicate.stream():
-                    if chunk["type"] == "audio":
-                        audio_buffer.write(chunk["data"])
-                        audio_chunks += 1
-
-                logger.debug(f"接收到{audio_chunks}个音频数据块")
-
-                if audio_chunks == 0:
-                    raise RuntimeError("未接收到任何音频数据")
-
-                audio_buffer.seek(0)  # 重置指针位置
-                data, fs = sf.read(audio_buffer)
-                logger.debug(f"成功生成语音: 数据长度={len(data)}, 采样率={fs}")
-                return data, fs
+                await communicate.save(file_path)
+                logger.debug(f"成功生成语音并保存至: {file_path}")
+                return
             except NoAudioReceived as e:
                 retry_count += 1
                 logger.warning(
@@ -745,8 +786,8 @@ class TTSHandler:
 
         for name in student_names:
             try:
-                data, fs = self.cache_manager.get_voice(name, voice_name)
-                if not self.playback_system.add_task((data, fs)):
+                file_path = self.cache_manager.get_voice(name, voice_name)
+                if not self.playback_system.add_task(file_path):
                     logger.exception(f"提交播放任务失败: {name}")
             except Exception as e:
                 logger.exception(f"处理{name}失败: {e}")

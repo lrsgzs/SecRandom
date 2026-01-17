@@ -1,4 +1,5 @@
 from loguru import logger
+from random import SystemRandom
 
 from PySide6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QApplication
 from PySide6.QtCore import Qt, QPoint, QTimer, QPropertyAnimation, QEasingCurve, QRect
@@ -11,6 +12,8 @@ from app.Language.obtain_language import get_any_position_value
 from app.tools.settings_access import readme_settings_async
 from app.common.IPC_URL.url_ipc_handler import URLIPCHandler
 from app.common.IPC_URL.csharp_ipc_handler import CSharpIPCHandler
+
+system_random = SystemRandom()
 
 
 class NotificationContentWidget(QWidget):
@@ -448,6 +451,36 @@ class FloatingNotificationWindow(CardWidget):
 
         return screen
 
+    def _get_position_coordinates(
+        self, screen_geometry, window_width, window_height, position_index
+    ):
+        """获取位置坐标 (x, y)"""
+        center_x = screen_geometry.center().x() - window_width // 2
+        center_y = screen_geometry.center().y() - window_height // 2
+        left_x = screen_geometry.left()
+        right_x = screen_geometry.right() - window_width
+        top_y = screen_geometry.top()
+        bottom_y = (
+            screen_geometry.bottom() - window_height * WINDOW_BOTTOM_POSITION_FACTOR
+        )
+
+        # 定义位置映射 (x, y)
+        # 0: 中心, 1: 顶部, 2: 底部, 3: 左侧, 4: 右侧,
+        # 5: 顶部左侧, 6: 顶部右侧, 7: 底部左侧, 8: 底部右侧
+        positions = {
+            0: (center_x, center_y),
+            1: (center_x, top_y),
+            2: (center_x, bottom_y),
+            3: (left_x, center_y),
+            4: (right_x, center_y),
+            5: (left_x, top_y),
+            6: (right_x, top_y),
+            7: (left_x, bottom_y),
+            8: (right_x, bottom_y),
+        }
+
+        return positions.get(position_index, (center_x, center_y))
+
     def _calculate_window_position(
         self, screen_geometry, position_index, horizontal_offset, vertical_offset
     ):
@@ -455,54 +488,16 @@ class FloatingNotificationWindow(CardWidget):
         window_width = 300
         window_height = 200
 
-        # 根据设置计算位置
-        # 位置映射基于语言文件:
-        # 0: 中心, 1: 顶部, 2: 底部, 3: 左侧, 4: 右侧,
-        # 5: 顶部左侧, 6: 顶部右侧, 7: 底部左侧, 8: 底部右侧
-        if position_index == 0:  # 中心
-            x = screen_geometry.center().x() - window_width // 2 + horizontal_offset
-            y = screen_geometry.center().y() - window_height // 2 + vertical_offset
-        elif position_index == 1:  # 顶部
-            x = screen_geometry.center().x() - window_width // 2 + horizontal_offset
-            y = screen_geometry.top() + vertical_offset
-        elif position_index == 2:  # 底部
-            x = screen_geometry.center().x() - window_width // 2 + horizontal_offset
-            y = (
-                screen_geometry.bottom()
-                - window_height * WINDOW_BOTTOM_POSITION_FACTOR
-                + vertical_offset
-            )
-        elif position_index == 3:  # 左侧
-            x = screen_geometry.left() + horizontal_offset
-            y = screen_geometry.center().y() - window_height // 2 + vertical_offset
-        elif position_index == 4:  # 右侧
-            x = screen_geometry.right() - window_width + horizontal_offset
-            y = screen_geometry.center().y() - window_height // 2 + vertical_offset
-        elif position_index == 5:  # 顶部左侧
-            x = screen_geometry.left() + horizontal_offset
-            y = screen_geometry.top() + vertical_offset
-        elif position_index == 6:  # 顶部右侧
-            x = screen_geometry.right() - window_width + horizontal_offset
-            y = screen_geometry.top() + vertical_offset
-        elif position_index == 7:  # 底部左侧
-            x = screen_geometry.left() + horizontal_offset
-            y = (
-                screen_geometry.bottom()
-                - window_height * WINDOW_BOTTOM_POSITION_FACTOR
-                + vertical_offset
-            )
-        elif position_index == 8:  # 底部右侧
-            x = screen_geometry.right() - window_width + horizontal_offset
-            y = (
-                screen_geometry.bottom()
-                - window_height * WINDOW_BOTTOM_POSITION_FACTOR
-                + vertical_offset
-            )
-        else:  # 默认为中心
-            x = screen_geometry.center().x() - window_width // 2
-            y = screen_geometry.center().y() - window_height // 2
+        base_x, base_y = self._get_position_coordinates(
+            screen_geometry, window_width, window_height, position_index
+        )
 
-        return QRect(x, y, window_width, window_height)
+        return QRect(
+            int(base_x + horizontal_offset),
+            int(base_y + vertical_offset),
+            window_width,
+            window_height,
+        )
 
     def position_window(self, settings=None):
         """根据设置定位浮窗"""
@@ -531,78 +526,33 @@ class FloatingNotificationWindow(CardWidget):
         self, final_geometry, screen_geometry, position_index
     ):
         """根据位置确定动画起始位置，确保从屏幕外进入"""
-        if position_index == 0:  # 中心
-            start_geometry = QRect(
-                final_geometry.center().x() - final_geometry.width() // 2,
-                final_geometry.center().y() - final_geometry.height() // 2,
-                0,
-                0,
-            )
-        elif position_index == 1:  # 顶部
-            start_geometry = QRect(
-                final_geometry.x(),
-                screen_geometry.top() - final_geometry.height(),  # 从屏幕顶部外进入
-                final_geometry.width(),
-                final_geometry.height(),
-            )
-        elif position_index == 2:  # 底部
-            start_geometry = QRect(
-                final_geometry.x(),
-                screen_geometry.bottom(),  # 从屏幕底部外进入
-                final_geometry.width(),
-                0,  # 高度从0开始动画
-            )
-        elif position_index == 3:  # 左侧
-            start_geometry = QRect(
-                screen_geometry.left() - final_geometry.width(),  # 从屏幕左侧外进入
-                final_geometry.y(),
-                0,  # 宽度从0开始动画
-                final_geometry.height(),
-            )
-        elif position_index == 4:  # 右侧
-            start_geometry = QRect(
-                screen_geometry.right(),  # 从屏幕右侧外进入
-                final_geometry.y(),
-                0,  # 宽度从0开始动画
-                final_geometry.height(),
-            )
-        elif position_index == 5:  # 顶部左侧
-            start_geometry = QRect(
-                screen_geometry.left() - final_geometry.width(),  # 从屏幕左侧外进入
-                screen_geometry.top() - final_geometry.height(),  # 从屏幕顶部外进入
-                0,  # 宽度从0开始动画
-                0,  # 高度从0开始动画
-            )
-        elif position_index == 6:  # 顶部右侧
-            start_geometry = QRect(
-                screen_geometry.right(),  # 从屏幕右侧外进入
-                screen_geometry.top() - final_geometry.height(),  # 从屏幕顶部外进入
-                0,  # 宽度从0开始动画
-                0,  # 高度从0开始动画
-            )
-        elif position_index == 7:  # 底部左侧
-            start_geometry = QRect(
-                screen_geometry.left() - final_geometry.width(),  # 从屏幕左侧外进入
-                screen_geometry.bottom(),  # 从屏幕底部外进入
-                0,  # 宽度从0开始动画
-                0,  # 高度从0开始动画
-            )
-        elif position_index == 8:  # 底部右侧
-            start_geometry = QRect(
-                screen_geometry.right(),  # 从屏幕右侧外进入
-                screen_geometry.bottom(),  # 从屏幕底部外进入
-                0,  # 宽度从0开始动画
-                0,  # 高度从0开始动画
-            )
-        else:  # 默认为中心，从中心缩放进入
-            start_geometry = QRect(
-                final_geometry.center().x() - final_geometry.width() // 2,
-                final_geometry.center().y() - final_geometry.height() // 2,
-                0,
-                0,
-            )
+        center_x = final_geometry.center().x()
+        center_y = final_geometry.center().y()
+        w = final_geometry.width()
+        h = final_geometry.height()
 
-        return start_geometry
+        # 定义起始位置映射 (x, y, w, h)
+        # 0: 中心 (从中心缩放)
+        # 1: 顶部 (从屏幕顶部外进入)
+        # 2: 底部 (高度从0开始)
+        # 3: 左侧 (宽度从0开始)
+        # 4: 右侧 (宽度从0开始)
+        # 5-8: 角落 (宽高都从0开始)
+        start_rects = {
+            0: (center_x - w // 2, center_y - h // 2, 0, 0),
+            1: (final_geometry.x(), screen_geometry.top() - h, w, h),
+            2: (final_geometry.x(), screen_geometry.bottom(), w, 0),
+            3: (screen_geometry.left() - w, final_geometry.y(), 0, h),
+            4: (screen_geometry.right(), final_geometry.y(), 0, h),
+            5: (screen_geometry.left() - w, screen_geometry.top() - h, 0, 0),
+            6: (screen_geometry.right(), screen_geometry.top() - h, 0, 0),
+            7: (screen_geometry.left() - w, screen_geometry.bottom(), 0, 0),
+            8: (screen_geometry.right(), screen_geometry.bottom(), 0, 0),
+        }
+
+        # 获取参数，默认为中心缩放
+        rect_params = start_rects.get(position_index, start_rects[0])
+        return QRect(*rect_params)
 
     def start_show_animation(self, settings=None):
         """开始显示动画"""
@@ -782,6 +732,74 @@ class FloatingNotificationWindow(CardWidget):
         # 隐藏窗口
         self.hide()
 
+    @property
+    def current_theme_foreground(self):
+        """获取当前主题下的前景色"""
+        try:
+            from app.tools.personalised import is_dark_theme
+            from qfluentwidgets import qconfig
+
+            return "#ffffff" if is_dark_theme(qconfig) else "#000000"
+        except Exception:
+            return "#000000"
+
+    def _apply_custom_font(self, label, font_settings_group):
+        """应用自定义字体"""
+        if not font_settings_group:
+            return
+
+        use_global_font = readme_settings_async(font_settings_group, "use_global_font")
+        if use_global_font == 1:
+            custom_font = readme_settings_async(font_settings_group, "custom_font")
+            if custom_font and hasattr(label, "setStyleSheet"):
+                current_style = label.styleSheet()
+                # 检查是否已经包含该字体设置，避免重复添加
+                if f"font-family: '{custom_font}'" not in current_style:
+                    label.setStyleSheet(
+                        f"font-family: '{custom_font}'; {current_style}"
+                    )
+
+    def _calculate_target_size(self, student_labels):
+        """计算目标窗口大小"""
+        total_height = 0
+        max_width = 0
+
+        for label in student_labels:
+            # 计算标签大小
+            label.adjustSize()
+            size_hint = label.sizeHint()
+            total_height += size_hint.height()
+            max_width = max(max_width, size_hint.width())
+
+        # 加上布局间距和边距
+        spacing = self.content_layout.spacing()
+        margins = self.content_layout.contentsMargins()
+
+        if student_labels:
+            total_height += spacing * (len(student_labels) - 1)
+
+        total_height += margins.top() + margins.bottom()
+        max_width += margins.left() + margins.right()
+
+        # 加上倒计时标签的高度
+        if self.countdown_label:
+            countdown_height = self.countdown_label.sizeHint().height()
+            total_height += countdown_height + spacing
+
+        # 设置窗口大小限制
+        window_width = max(300, max_width + 30)
+        window_height = min(600, total_height + 30)
+
+        return window_width, window_height
+
+    def _clear_content_layout(self):
+        """清除内容布局中的所有控件"""
+        while self.content_layout.count():
+            item = self.content_layout.takeAt(0)
+            widget = item.widget()
+            if widget:
+                widget.deleteLater()
+
     def update_content(
         self,
         student_labels,
@@ -802,67 +820,30 @@ class FloatingNotificationWindow(CardWidget):
             self.settings_group = settings_group
         elif font_settings_group:
             # 如果没有提供settings_group，尝试从font_settings_group推断
-            if font_settings_group == "roll_call_settings":
-                self.settings_group = "roll_call_notification_settings"
-            elif font_settings_group == "quick_draw_settings":
-                self.settings_group = "quick_draw_notification_settings"
-            elif font_settings_group == "lottery_settings":
-                self.settings_group = "lottery_notification_settings"
+            group_mapping = {
+                "roll_call_settings": "roll_call_notification_settings",
+                "quick_draw_settings": "quick_draw_notification_settings",
+                "lottery_settings": "lottery_notification_settings",
+            }
+            self.settings_group = group_mapping.get(font_settings_group, None)
 
         if not student_labels:
             return
 
-        # 预计算窗口大小
-        total_height = 0
-        max_width = 0
+        # 应用字体并预计算窗口大小
         for label in student_labels:
-            # 应用字体设置
-            if font_settings_group:
-                use_global_font = readme_settings_async(
-                    font_settings_group, "use_global_font"
-                )
-                custom_font = None
-                if use_global_font == 1:
-                    custom_font = readme_settings_async(
-                        font_settings_group, "custom_font"
-                    )
-                    if custom_font and hasattr(label, "setStyleSheet"):
-                        current_style = label.styleSheet()
-                        label.setStyleSheet(
-                            f"font-family: '{custom_font}'; {current_style}"
-                        )
-            # 计算标签大小
-            label.adjustSize()
-            size_hint = label.sizeHint()
-            total_height += size_hint.height()
-            max_width = max(max_width, size_hint.width())
+            self._apply_custom_font(label, font_settings_group)
 
-        # 加上布局间距和边距
-        spacing = self.content_layout.spacing()
-        margins = self.content_layout.contentsMargins()
-        total_height += spacing * (len(student_labels) - 1)
-        total_height += margins.top() + margins.bottom()
-        max_width += margins.left() + margins.right()
-
-        # 加上倒计时标签的高度
-        if self.countdown_label:
-            countdown_height = self.countdown_label.sizeHint().height()
-            total_height += countdown_height + spacing
+        window_width, window_height = self._calculate_target_size(student_labels)
 
         # 清除所有旧控件
-        while self.content_layout.count():
-            item = self.content_layout.takeAt(0)
-            widget = item.widget()
-            if widget:
-                widget.deleteLater()
+        self._clear_content_layout()
 
         # 添加新控件
         for label in student_labels:
             self.content_layout.addWidget(label)
 
         # 设置窗口大小
-        window_width = max(300, max_width + 30)
-        window_height = min(600, total_height + 30)
         self.setFixedSize(window_width, window_height)
 
         # 确保颜色与当前主题同步
@@ -942,9 +923,75 @@ class FloatingNotificationManager:
         """
 
         try:
+
+            def _normalize_text(value):
+                text = str(value or "")
+                text = text.replace("\r\n", "\n").replace("\r", "\n")
+                if "\n" in text:
+                    text = " - ".join(
+                        [part.strip() for part in text.split("\n") if part.strip()]
+                    )
+                return text
+
+            show_random = 0
+            if settings:
+                try:
+                    show_random = int(settings.get("show_random", 0) or 0)
+                except Exception:
+                    show_random = 0
+
+            group_mode = False
+            for item in selected_students or []:
+                if (
+                    isinstance(item, (list, tuple))
+                    and len(item) >= 2
+                    and item[0] is None
+                ):
+                    group_mode = True
+                    break
+
+            if group_mode:
+                from app.common.data.list import get_group_members
+
+                selected_students_for_ipc = []
+                for item in selected_students or []:
+                    if not isinstance(item, (list, tuple)) or len(item) < 3:
+                        continue
+                    group_name = _normalize_text(item[1])
+                    exist = bool(item[2])
+
+                    if show_random in (1, 2):
+                        group_members = get_group_members(class_name, group_name)
+                        if group_members:
+                            selected_member = system_random.choice(group_members)
+                            selected_name = _normalize_text(
+                                (selected_member or {}).get("name", "")
+                            )
+                            if selected_name:
+                                group_name = f"{group_name} - {selected_name}"
+
+                    selected_students_for_ipc.append(
+                        (0, _normalize_text(group_name), exist)
+                    )
+            else:
+                selected_students_for_ipc = []
+                for item in selected_students or []:
+                    if not isinstance(item, (list, tuple)) or len(item) < 3:
+                        continue
+                    student_id = item[0]
+                    if student_id is None:
+                        student_id = 0
+                    selected_students_for_ipc.append(
+                        (student_id, _normalize_text(item[1]), bool(item[2]))
+                    )
+
             cs_ipc = CSharpIPCHandler.instance()
             status = cs_ipc.send_notification(
-                class_name, selected_students, draw_count, settings, settings_group
+                class_name,
+                selected_students_for_ipc,
+                draw_count,
+                settings,
+                settings_group,
             )
             if status:
                 logger.info("成功发送通知到ClassIsland，结果未知")
@@ -977,6 +1024,39 @@ class FloatingNotificationManager:
             else:
                 logger.warning("发送通知到ClassIsland时出错，但不回退")
 
+    def _get_display_settings(self, settings):
+        """获取显示设置"""
+        if settings:
+            return {
+                "font_size": settings.get("font_size", 50),
+                "animation_color": settings.get("animation_color_theme", 0),
+                "display_format": settings.get("display_format", 0),
+                "show_student_image": settings.get("student_image", False),
+                "is_animation_enabled": settings.get("animation", True),
+                "show_random": settings.get("show_random", 0),
+            }
+        return {
+            "font_size": 50,
+            "animation_color": 0,
+            "display_format": 0,
+            "show_student_image": False,
+            "is_animation_enabled": True,
+            "show_random": 0,
+        }
+
+    def _determine_font_settings_group(self, settings_group):
+        """确定字体设置组"""
+        if settings_group is None:
+            return "notification_settings", "notification_settings"
+
+        group_mapping = {
+            "roll_call_notification_settings": "roll_call_settings",
+            "quick_draw_notification_settings": "quick_draw_settings",
+            "lottery_notification_settings": "lottery_settings",
+        }
+        font_settings_group = group_mapping.get(settings_group, settings_group)
+        return settings_group, font_settings_group
+
     def _show_secrandom_notification(
         self,
         class_name,
@@ -997,45 +1077,32 @@ class FloatingNotificationManager:
             is_animating: 是否在动画过程中，如果是则不启动自动关闭定时器
         """
         # 重新调用SecRandom通知服务，使用原始的show_roll_call_result逻辑
-        if settings:
-            font_size = settings.get("font_size", 50)
-            animation_color = settings.get("animation_color_theme", 0)
-            display_format = settings.get("display_format", 0)
-            show_student_image = settings.get("student_image", False)
-            is_animation_enabled = settings.get("animation", True)
-        else:
-            # 当没有传递设置时，使用默认值
-            font_size = 50
-            animation_color = 0
-            display_format = 0
-            show_student_image = False
-            is_animation_enabled = True
+        display_settings = self._get_display_settings(settings)
 
         # 使用ResultDisplayUtils创建学生标签（动态导入避免循环依赖）
         from app.common.display.result_display import ResultDisplayUtils
 
         # 确定使用的设置组
-        # 如果 settings_group 是通知设置组，则使用对应的功能设置组的字体设置
-        if settings_group is None:
-            settings_group = "notification_settings"
-        # 根据通知设置组名称确定对应的功能设置组
-        if settings_group == "roll_call_notification_settings":
-            font_settings_group = "roll_call_settings"
-        elif settings_group == "quick_draw_notification_settings":
-            font_settings_group = "quick_draw_settings"
-        elif settings_group == "lottery_notification_settings":
-            font_settings_group = "lottery_settings"
-        else:
-            font_settings_group = settings_group
+        settings_group, font_settings_group = self._determine_font_settings_group(
+            settings_group
+        )
+
+        group_index = 0
+        for item in selected_students or []:
+            if isinstance(item, (list, tuple)) and len(item) >= 2 and item[0] is None:
+                group_index = 1
+                break
 
         student_labels = ResultDisplayUtils.create_student_label(
             class_name=class_name,
             selected_students=selected_students,
             draw_count=draw_count,
-            font_size=font_size,
-            animation_color=animation_color,
-            display_format=display_format,
-            show_student_image=show_student_image,
+            font_size=display_settings["font_size"],
+            animation_color=display_settings["animation_color"],
+            display_format=display_settings["display_format"],
+            show_student_image=display_settings["show_student_image"],
+            group_index=group_index,
+            show_random=display_settings.get("show_random", 0),
             settings_group=font_settings_group,
             custom_font_family=font_settings_group,
         )
@@ -1045,7 +1112,7 @@ class FloatingNotificationManager:
             self.notification_windows["floating"] = FloatingNotificationWindow()
 
         window = self.notification_windows["floating"]
-        window.is_animation_enabled = is_animation_enabled
+        window.is_animation_enabled = display_settings["is_animation_enabled"]
         # 如果窗口已经存在并且有活动的自动关闭定时器，停止它以防止窗口被隐藏
         if window.auto_close_timer.isActive():
             window.auto_close_timer.stop()
@@ -1137,75 +1204,13 @@ class FloatingNotificationManager:
             # 继续执行下面的内置通知逻辑，不return
 
         # 否则使用SecRandom浮窗通知
-        # 获取设置
-        if settings:
-            font_size = settings.get("font_size", 50)
-            animation_color = settings.get("animation_color_theme", 0)
-            display_format = settings.get("display_format", 0)
-            show_student_image = settings.get("student_image", False)
-            is_animation_enabled = settings.get("animation", True)
-        else:
-            # 当没有传递设置时，使用默认值
-            font_size = 50
-            animation_color = 0
-            display_format = 0
-            show_student_image = False
-            is_animation_enabled = True
-
-        # 使用ResultDisplayUtils创建学生标签（动态导入避免循环依赖）
-        from app.common.display.result_display import ResultDisplayUtils
-
-        # 确定使用的设置组
-        # 如果 settings_group 是通知设置组，则使用对应的功能设置组的字体设置
-        if settings_group is None:
-            settings_group = "notification_settings"
-        # 根据通知设置组名称确定对应的功能设置组
-        if settings_group == "roll_call_notification_settings":
-            font_settings_group = "roll_call_settings"
-        elif settings_group == "quick_draw_notification_settings":
-            font_settings_group = "quick_draw_settings"
-        elif settings_group == "lottery_notification_settings":
-            font_settings_group = "lottery_settings"
-        else:
-            font_settings_group = settings_group
-
-        student_labels = ResultDisplayUtils.create_student_label(
-            class_name=class_name,
-            selected_students=selected_students,
-            draw_count=draw_count,
-            font_size=font_size,
-            animation_color=animation_color,
-            display_format=display_format,
-            show_student_image=show_student_image,
-            settings_group=font_settings_group,
-            custom_font_family=font_settings_group,
-        )
-
-        # 创建或获取通知窗口
-        if "floating" not in self.notification_windows:
-            self.notification_windows["floating"] = FloatingNotificationWindow()
-
-        window = self.notification_windows["floating"]
-        window.is_animation_enabled = is_animation_enabled
-        # 如果窗口已经存在并且有活动的自动关闭定时器，停止它以防止窗口被隐藏
-        if window.auto_close_timer.isActive():
-            window.auto_close_timer.stop()
-
-        # 应用显示时长设置到窗口
-        if settings:
-            display_duration = settings.get("notification_display_duration", 5)
-            window.apply_settings(
-                {**settings, "auto_close_time": display_duration},
-                settings_group,
-                is_animating,
-            )
-        else:
-            window.apply_settings(
-                {"auto_close_time": 5}, settings_group, is_animating
-            )  # 默认5秒
-
-        window.update_content(
-            student_labels, settings, font_settings_group, settings_group
+        self._show_secrandom_notification(
+            class_name,
+            selected_students,
+            draw_count,
+            settings,
+            settings_group,
+            is_animating,
         )
 
     def close_all_notifications(self):

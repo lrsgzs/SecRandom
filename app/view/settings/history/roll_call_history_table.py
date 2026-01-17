@@ -54,6 +54,9 @@ class roll_call_history_table(GroupHeaderCardWidget):
         self.is_loading = False  # 是否正在加载数据
         self.has_class_record = False  # 是否有课程记录
         self.available_subjects = []  # 可用的课程列表
+        self.cached_students_data = []  # 缓存的学生数据列表
+        self.cached_sessions_data = []  # 缓存的会话数据列表
+        self.cached_stats_data = []  # 缓存的统计数据列表
 
         # 创建班级选择区域
         QTimer.singleShot(APPLY_DELAY, self.create_class_selection)
@@ -243,6 +246,11 @@ class roll_call_history_table(GroupHeaderCardWidget):
         self.current_row = 0
         self.table.setRowCount(0)
 
+        # 清空缓存，确保排序时重新获取数据
+        self.cached_students_data = []
+        self.cached_sessions_data = []
+        self.cached_stats_data = []
+
         # 重新加载数据
         self.refresh_data()
 
@@ -379,59 +387,71 @@ class roll_call_history_table(GroupHeaderCardWidget):
         if not self.current_class_name:
             return
         try:
-            cleaned_students = get_roll_call_student_list(self.current_class_name)
-            history_data = get_roll_call_history_data(self.current_class_name)
+            # 如果是第一次加载（current_row == 0），获取并排序数据
+            if self.current_row == 0:
+                cleaned_students = get_roll_call_student_list(self.current_class_name)
+                history_data = get_roll_call_history_data(self.current_class_name)
 
-            if self.current_subject:
-                history_data = filter_roll_call_history_by_subject(
-                    history_data, self.current_subject
+                if self.current_subject:
+                    history_data = filter_roll_call_history_by_subject(
+                        history_data, self.current_subject
+                    )
+
+                students_data = get_roll_call_students_data(
+                    cleaned_students, history_data, self.current_subject
                 )
 
-            students_data = get_roll_call_students_data(
-                cleaned_students, history_data, self.current_subject
-            )
+                students_weight_data = calculate_weight(
+                    students_data, self.current_class_name, self.current_subject
+                )
 
-            students_weight_data = calculate_weight(
-                students_data, self.current_class_name, self.current_subject
-            )
+                format_weight, _, _ = format_weight_for_display(
+                    students_weight_data, "next_weight"
+                )
 
-            format_weight, _, _ = format_weight_for_display(
-                students_weight_data, "next_weight"
-            )
+                if self.sort_column >= 0:
 
-            if self.sort_column >= 0:
+                    def sort_key(student):
+                        if self.sort_column == 0:
+                            return student.get("id", "")
+                        elif self.sort_column == 1:
+                            return student.get("name", "")
+                        elif self.sort_column == 2:
+                            return student.get("gender", "")
+                        elif self.sort_column == 3:
+                            return student.get("group", "")
+                        elif self.sort_column == 4:
+                            return student.get("total_count", 0)
+                        elif self.sort_column == 5:
+                            for weight_student in students_weight_data:
+                                if weight_student.get("id") == student.get(
+                                    "id"
+                                ) and weight_student.get("name") == student.get("name"):
+                                    return weight_student.get("next_weight", 1.0)
+                            return 1.0
+                        return ""
 
-                def sort_key(student):
-                    if self.sort_column == 0:
-                        return student.get("id", "")
-                    elif self.sort_column == 1:
-                        return student.get("name", "")
-                    elif self.sort_column == 2:
-                        return student.get("gender", "")
-                    elif self.sort_column == 3:
-                        return student.get("group", "")
-                    elif self.sort_column == 4:
-                        return student.get("total_count", 0)
-                    elif self.sort_column == 5:
+                    reverse_order = self.sort_order == Qt.SortOrder.DescendingOrder
+                    students_data.sort(key=sort_key, reverse=reverse_order)
+                    sorted_weight_data = []
+                    for student in students_data:
                         for weight_student in students_weight_data:
                             if weight_student.get("id") == student.get(
                                 "id"
                             ) and weight_student.get("name") == student.get("name"):
-                                return weight_student.get("next_weight", 1.0)
-                        return 1.0
-                    return ""
+                                sorted_weight_data.append(weight_student)
+                                break
+                    students_weight_data = sorted_weight_data
 
-                reverse_order = self.sort_order == Qt.SortOrder.DescendingOrder
-                students_data.sort(key=sort_key, reverse=reverse_order)
-                sorted_weight_data = []
-                for student in students_data:
-                    for weight_student in students_weight_data:
-                        if weight_student.get("id") == student.get(
-                            "id"
-                        ) and weight_student.get("name") == student.get("name"):
-                            sorted_weight_data.append(weight_student)
-                            break
-                students_weight_data = sorted_weight_data
+                # 缓存排序后的数据
+                self.cached_students_data = students_data
+                self.cached_students_weight_data = students_weight_data
+                self.cached_format_weight = format_weight
+            else:
+                # 使用缓存的数据
+                students_data = self.cached_students_data
+                students_weight_data = self.cached_students_weight_data
+                format_weight = self.cached_format_weight
 
             start_row = self.current_row
             end_row = min(start_row + self.batch_size, self.total_rows)
@@ -473,14 +493,15 @@ class roll_call_history_table(GroupHeaderCardWidget):
                 col += 1
 
                 if self.table.columnCount() > col:
-                    weight_item = create_table_item(
-                        str(
-                            format_weight(
-                                students_weight_data[i].get("next_weight", "")
+                    if i < len(students_weight_data):
+                        weight_item = create_table_item(
+                            str(
+                                format_weight(
+                                    students_weight_data[i].get("next_weight", "")
+                                )
                             )
                         )
-                    )
-                    self.table.setItem(row, col, weight_item)
+                        self.table.setItem(row, col, weight_item)
 
             self.current_row = end_row
 
@@ -492,44 +513,56 @@ class roll_call_history_table(GroupHeaderCardWidget):
         if not self.current_class_name:
             return
         try:
-            cleaned_students = get_roll_call_student_list(self.current_class_name)
-            history_data = get_roll_call_history_data(self.current_class_name)
+            # 如果是第一次加载（current_row == 0），获取并排序数据
+            if self.current_row == 0:
+                cleaned_students = get_roll_call_student_list(self.current_class_name)
+                history_data = get_roll_call_history_data(self.current_class_name)
 
-            students_data = get_roll_call_session_data(
-                cleaned_students, history_data, self.current_subject
-            )
+                students_data = get_roll_call_session_data(
+                    cleaned_students, history_data, self.current_subject
+                )
 
-            self.has_class_record = any(
-                student.get("class_name", "") for student in students_data
-            )
+                self.has_class_record = any(
+                    student.get("class_name", "") for student in students_data
+                )
 
-            self.update_table_headers()
+                self.update_table_headers()
 
-            format_weight, _, _ = format_weight_for_display(students_data, "weight")
+                format_weight, _, _ = format_weight_for_display(students_data, "weight")
 
-            if self.sort_column >= 0:
+                if self.sort_column >= 0:
 
-                def sort_key(student):
-                    if self.sort_column == 0:
-                        return student.get("draw_time", "")
-                    elif self.sort_column == 1:
-                        return student.get("id", "")
-                    elif self.sort_column == 2:
-                        return student.get("name", "")
-                    elif self.sort_column == 3:
-                        return student.get("gender", "")
-                    elif self.sort_column == 4:
-                        return student.get("group", "")
-                    elif self.sort_column == 5:
-                        return student.get("class_name", "")
-                    elif self.sort_column == 6:
-                        return student.get("weight", "")
-                    return ""
+                    def sort_key(student):
+                        if self.sort_column == 0:
+                            return student.get("draw_time", "")
+                        elif self.sort_column == 1:
+                            return student.get("id", "")
+                        elif self.sort_column == 2:
+                            return student.get("name", "")
+                        elif self.sort_column == 3:
+                            return student.get("gender", "")
+                        elif self.sort_column == 4:
+                            return student.get("group", "")
+                        elif self.sort_column == 5:
+                            return student.get("class_name", "")
+                        elif self.sort_column == 6:
+                            return student.get("weight", "")
+                        return ""
 
-                reverse_order = self.sort_order == Qt.SortOrder.DescendingOrder
-                students_data.sort(key=sort_key, reverse=reverse_order)
+                    reverse_order = self.sort_order == Qt.SortOrder.DescendingOrder
+                    students_data.sort(key=sort_key, reverse=reverse_order)
+                else:
+                    students_data.sort(
+                        key=lambda x: x.get("draw_time", ""), reverse=True
+                    )
+
+                # 缓存排序后的数据
+                self.cached_sessions_data = students_data
+                self.cached_sessions_format_weight = format_weight
             else:
-                students_data.sort(key=lambda x: x.get("draw_time", ""), reverse=True)
+                # 使用缓存的数据
+                students_data = self.cached_sessions_data
+                format_weight = self.cached_sessions_format_weight
 
             start_row = self.current_row
             end_row = min(start_row + self.batch_size, self.total_rows)
@@ -594,44 +627,56 @@ class roll_call_history_table(GroupHeaderCardWidget):
         if not self.current_class_name:
             return
         try:
-            cleaned_students = get_roll_call_student_list(self.current_class_name)
-            history_data = get_roll_call_history_data(self.current_class_name)
+            # 如果是第一次加载（current_row == 0），获取并排序数据
+            if self.current_row == 0:
+                cleaned_students = get_roll_call_student_list(self.current_class_name)
+                history_data = get_roll_call_history_data(self.current_class_name)
 
-            students_data = get_roll_call_student_stats_data(
-                cleaned_students, history_data, student_name, self.current_subject
-            )
+                students_data = get_roll_call_student_stats_data(
+                    cleaned_students, history_data, student_name, self.current_subject
+                )
 
-            self.has_class_record = any(
-                student.get("class_name", "") for student in students_data
-            )
+                self.has_class_record = any(
+                    student.get("class_name", "") for student in students_data
+                )
 
-            self.update_table_headers()
+                self.update_table_headers()
 
-            format_weight, _, _ = format_weight_for_display(students_data, "weight")
+                format_weight, _, _ = format_weight_for_display(students_data, "weight")
 
-            if self.sort_column >= 0:
+                if self.sort_column >= 0:
 
-                def sort_key(student):
-                    if self.sort_column == 0:
-                        return student.get("draw_time", "")
-                    elif self.sort_column == 1:
-                        return str(student.get("draw_method", ""))
-                    elif self.sort_column == 2:
-                        return int(student.get("draw_people_numbers", 0))
-                    elif self.sort_column == 3:
-                        return str(student.get("draw_gender", ""))
-                    elif self.sort_column == 4:
-                        return str(student.get("draw_group", ""))
-                    elif self.sort_column == 5:
-                        return str(student.get("class_name", ""))
-                    elif self.sort_column == 6:
-                        return float(student.get("weight", ""))
-                    return ""
+                    def sort_key(student):
+                        if self.sort_column == 0:
+                            return student.get("draw_time", "")
+                        elif self.sort_column == 1:
+                            return str(student.get("draw_method", ""))
+                        elif self.sort_column == 2:
+                            return int(student.get("draw_people_numbers", 0))
+                        elif self.sort_column == 3:
+                            return str(student.get("draw_gender", ""))
+                        elif self.sort_column == 4:
+                            return str(student.get("draw_group", ""))
+                        elif self.sort_column == 5:
+                            return str(student.get("class_name", ""))
+                        elif self.sort_column == 6:
+                            return float(student.get("weight", ""))
+                        return ""
 
-                reverse_order = self.sort_order == Qt.SortOrder.DescendingOrder
-                students_data.sort(key=sort_key, reverse=reverse_order)
+                    reverse_order = self.sort_order == Qt.SortOrder.DescendingOrder
+                    students_data.sort(key=sort_key, reverse=reverse_order)
+                else:
+                    students_data.sort(
+                        key=lambda x: x.get("draw_time", ""), reverse=True
+                    )
+
+                # 缓存排序后的数据
+                self.cached_stats_data = students_data
+                self.cached_stats_format_weight = format_weight
             else:
-                students_data.sort(key=lambda x: x.get("draw_time", ""), reverse=True)
+                # 使用缓存的数据
+                students_data = self.cached_stats_data
+                format_weight = self.cached_stats_format_weight
 
             start_row = self.current_row
             end_row = min(start_row + self.batch_size, self.total_rows)
@@ -893,6 +938,7 @@ class roll_call_history_table(GroupHeaderCardWidget):
         self.current_row = 0
         self.is_loading = False
         self.table.setRowCount(0)
+        self.table.setSortingEnabled(False)
         self.table.blockSignals(True)
 
         try:
