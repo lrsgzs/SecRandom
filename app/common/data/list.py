@@ -44,7 +44,7 @@ def get_class_name_list() -> List[str]:
         return class_files
 
     except Exception as e:
-        logger.exception(f"获取班级列表失败: {e}")
+        logger.error(f"获取班级列表失败: {e}")
         return []
 
 
@@ -93,7 +93,7 @@ def get_student_list(class_name: str) -> List[Dict[str, Any]]:
         return student_list
 
     except Exception as e:
-        logger.exception(f"获取学生列表失败: {e}")
+        logger.error(f"获取学生列表失败: {e}")
         return []
 
 
@@ -204,7 +204,7 @@ def get_pool_name_list() -> List[str]:
         return pool_files
 
     except Exception as e:
-        logger.exception(f"获取奖池列表失败: {e}")
+        logger.error(f"获取奖池列表失败: {e}")
         return []
 
 
@@ -252,7 +252,7 @@ def get_pool_list(pool_name: str) -> List[Dict[str, Any]]:
         return pool_list
 
     except Exception as e:
-        logger.exception(f"获取奖池列表失败: {e}")
+        logger.error(f"获取奖池列表失败: {e}")
         return []
 
 
@@ -338,7 +338,7 @@ def filter_students_data(
         return students_data
 
     except Exception as e:
-        logger.exception(f"过滤学生数据失败: {e}")
+        logger.error(f"过滤学生数据失败: {e}")
         return []
 
 
@@ -369,7 +369,7 @@ def export_student_data(
         # 如果文件不存在，返回错误
         if not class_file_path.exists():
             error_msg = f"班级文件 '{class_name}.json' 不存在"
-            logger.exception(error_msg)
+            logger.error(error_msg)
             return False, error_msg
 
         # 读取JSON文件
@@ -390,16 +390,16 @@ def export_student_data(
             return _export_to_txt(data, file_path)
         else:
             error_msg = f"不支持的导出格式: {export_format}"
-            logger.exception(error_msg)
+            logger.error(error_msg)
             return False, error_msg
 
     except FileNotFoundError:
         error_msg = f"班级文件 '{class_name}.json' 不存在"
-        logger.exception(error_msg)
+        logger.error(error_msg)
         return False, error_msg
     except json.JSONDecodeError:
         error_msg = f"班级文件 '{class_name}.json' 格式错误"
-        logger.exception(error_msg)
+        logger.error(error_msg)
         return False, error_msg
     except Exception as e:
         error_msg = f"导出学生名单时出错: {str(e)}"
@@ -410,11 +410,7 @@ def export_student_data(
 def _generic_export_excel(export_data: List[Dict], file_path: str) -> Tuple[bool, str]:
     """通用导出Excel函数"""
     try:
-        try:
-            import pandas as pd
-        except Exception as e:
-            logger.exception(f"导出Excel需要 pandas 库，但导入失败: {e}")
-            return False, "导出失败: pandas 未安装或导入错误"
+        import pandas as pd
 
         df = pd.DataFrame(export_data)
 

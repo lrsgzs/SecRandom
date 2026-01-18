@@ -16,26 +16,30 @@ from app.tools.settings_access import readme_settings_async
 
 
 def _get_break_assignment_class_info() -> Dict:
-    """获取课间归属的课程信息
-
-    课间时段的记录归属到下节课
-
-    Returns:
-        Dict: 课程信息字典，包含 name, start_time, end_time, teacher, location, day_of_week
-              如果无法获取课程信息，返回空字典
-    """
     try:
         data_source = readme_settings_async("linkage_settings", "data_source")
+        assignment = readme_settings_async(
+            "linkage_settings", "subject_history_break_assignment"
+        )
+        if assignment is None:
+            assignment = 2
+
+        if assignment == 0:
+            return {
+                "name": get_content_name_async("linkage_settings", "break_subject_name")
+            }
 
         if data_source == 2:
-            logger.debug("尝试从 ClassIsland 获取课间归属课程信息")
-            class_info = CSharpIPCHandler.instance().get_next_class_info()
-            if class_info:
-                return class_info
+            if assignment == 1:
+                class_info = CSharpIPCHandler.instance().get_previous_class_info()
+                if class_info:
+                    return class_info
             else:
-                logger.debug(
-                    "从 ClassIsland 获取课间归属课程信息失败，回退到 CSES 文件"
-                )
+                logger.debug("尝试从 ClassIsland 获取课间归属课程信息")
+                class_info = CSharpIPCHandler.instance().get_next_class_info()
+                if class_info:
+                    return class_info
+            logger.debug("从 ClassIsland 获取课间归属课程信息失败，回退到 CSES 文件")
 
         if data_source == 0:
             logger.debug("未启用数据源，无法获取课间归属课程信息")
@@ -50,8 +54,28 @@ def _get_break_assignment_class_info() -> Dict:
 
         class_info_list = parser.get_class_info()
 
-        for class_info in class_info_list:
-            if class_info.get("day_of_week") == current_day_of_week:
+        if assignment == 1:
+            best_end_seconds = None
+            best_class_name = ""
+            for class_info in class_info_list:
+                if class_info.get("day_of_week") != current_day_of_week:
+                    continue
+                end_time_str = class_info.get("end_time", "")
+                if not end_time_str:
+                    continue
+                end_seconds = _parse_time_string_to_seconds(end_time_str)
+                if end_seconds <= current_total_seconds and (
+                    best_end_seconds is None or end_seconds > best_end_seconds
+                ):
+                    best_end_seconds = end_seconds
+                    best_class_name = class_info.get("name", "") or ""
+            if best_class_name:
+                logger.info(f"课间归属到上节课: {best_class_name}")
+                return {"name": best_class_name}
+        else:
+            for class_info in class_info_list:
+                if class_info.get("day_of_week") != current_day_of_week:
+                    continue
                 start_time_str = class_info.get("start_time", "")
                 if start_time_str:
                     start_seconds = _parse_time_string_to_seconds(start_time_str)
@@ -64,7 +88,7 @@ def _get_break_assignment_class_info() -> Dict:
         return {}
 
     except Exception as e:
-        logger.exception(f"获取课间归属课程信息失败: {e}")
+        logger.error(f"获取课间归属课程信息失败: {e}")
         return {}
 
 
@@ -88,6 +112,11 @@ def _is_non_class_time() -> bool:
             "linkage_settings", "pre_class_enable_time"
         )
         logger.debug(f"上课前提前解禁时间: {pre_class_enable_time}秒")
+        post_class_disable_delay = readme_settings_async(
+            "linkage_settings", "post_class_disable_delay"
+        )
+        if post_class_disable_delay is None:
+            post_class_disable_delay = 0
 
         data_source = readme_settings_async("linkage_settings", "data_source")
         logger.debug(f"数据源选择: {data_source}")
@@ -109,6 +138,16 @@ def _is_non_class_time() -> bool:
                 logger.debug(
                     f"距离上课{on_class_left_time}秒，小于等于提前解禁时间{pre_class_enable_time}秒，提前解禁"
                 )
+                return False
+
+            if (
+                is_breaking
+                and post_class_disable_delay > 0
+                and on_class_left_time > 0
+                and 0
+                < CSharpIPCHandler.instance().get_elapsed_since_previous_time_point_end_seconds()
+                <= post_class_disable_delay
+            ):
                 return False
 
             return is_breaking
@@ -133,6 +172,16 @@ def _is_non_class_time() -> bool:
             logger.debug(
                 f"距离上课{seconds_to_next_class}秒，小于等于提前解禁时间{pre_class_enable_time}秒，提前解禁"
             )
+            return False
+
+        if (
+            not is_in_class_time
+            and seconds_to_next_class > 0
+            and post_class_disable_delay > 0
+            and 0
+            < _get_seconds_since_last_class_end(current_day_of_week)
+            <= post_class_disable_delay
+        ):
             return False
 
         return not is_in_class_time
@@ -217,7 +266,7 @@ def _is_time_in_ranges(current_seconds: int, time_ranges: Dict[str, str]) -> boo
                 return True
 
         except Exception as e:
-            logger.exception(f"解析时间段失败: {range_name} = {time_range}, 错误: {e}")
+            logger.error(f"解析时间段失败: {range_name} = {time_range}, 错误: {e}")
             continue
 
     return False
@@ -243,7 +292,7 @@ def _get_cses_parser() -> CSESParser | None:
 
         parser = CSESParser()
         if not parser.load_from_file(str(cses_file_path)):
-            logger.exception(f"加载CSES文件失败: {str(cses_file_path)}")
+            logger.error(f"加载CSES文件失败: {str(cses_file_path)}")
             return None
 
         return parser
@@ -372,10 +421,35 @@ def _get_seconds_to_next_class() -> int:
 
         # 如果当天没有下一节课，返回0
         return 0
-
     except Exception as e:
         logger.exception(f"计算距离下一节课时间失败: {e}")
         return 0
+
+
+def _get_seconds_since_last_class_end(day_of_week: int) -> int:
+    class_times = _get_class_times_by_day(day_of_week)
+    if not class_times or not isinstance(class_times, dict):
+        return 0
+
+    current_total_seconds = _get_current_time_in_seconds()
+    best_end_seconds = None
+    for _, time_range in class_times.items():
+        try:
+            start_end = time_range.split("-")
+            if len(start_end) != 2:
+                continue
+            _, end_time_str = start_end
+            end_seconds = _parse_time_string_to_seconds(end_time_str)
+            if end_seconds <= current_total_seconds and (
+                best_end_seconds is None or end_seconds > best_end_seconds
+            ):
+                best_end_seconds = end_seconds
+        except Exception:
+            continue
+
+    if best_end_seconds is None:
+        return 0
+    return max(0, current_total_seconds - best_end_seconds)
 
 
 def _get_non_class_times_config() -> Dict[str, str]:

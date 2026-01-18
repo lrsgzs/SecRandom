@@ -14,6 +14,7 @@ FLOATING_WINDOW_MANAGEMENT_PATH = (
 SAFETY_SETTINGS_PATH = "app.view.settings.safety_settings:safety_settings"
 UPDATE_PATH = "app.view.settings.update:update"
 ABOUT_PATH = "app.view.settings.about:about"
+LINKAGE_SETTINGS_PATH = "app.view.settings.linkage_settings:linkage_settings"
 
 # 导入默认设置
 from app.tools.settings_default import *
@@ -140,18 +141,15 @@ class history_page(PivotPageTemplate):
         self.set_base_path("app.view.settings.history")
 
 
-class linkage_settings_page(PivotPageTemplate):
+class linkage_settings_page(PageTemplate):
     """创建联动设置页面"""
 
     def __init__(self, parent: QFrame = None, is_preview=False):
-        page_config = {
-            "linkage_settings": get_content_name_async("linkage_settings", "title"),
-            "classisland_settings": get_content_name_async(
-                "classisland_settings", "title"
-            ),
-        }
-        super().__init__(page_config, parent, is_preview_mode=is_preview)
-        self.set_base_path("app.view.settings.linkage_settings")
+        super().__init__(
+            content_widget_class=LINKAGE_SETTINGS_PATH,
+            parent=parent,
+            is_preview_mode=is_preview,
+        )
 
 
 class more_settings_page(PivotPageTemplate):

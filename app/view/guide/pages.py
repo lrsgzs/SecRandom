@@ -19,10 +19,6 @@ from app.view.settings.more_settings.music_settings import (
     music_management,
     music_settings_table,
 )
-from app.view.settings.linkage_settings.classisland_settings import (
-    roll_call_classisland_notification_service_settings,
-    quick_draw_classisland_notification_service_settings,
-)
 from app.view.settings.linkage_settings.linkage_settings import (
     class_break_settings,
     cses_import_settings,
@@ -36,6 +32,190 @@ from app.tools.variable import GITHUB_WEB, BILIBILI_WEB, WEBSITE
 
 
 from app.tools.config import import_all_data
+
+
+class roll_call_classisland_notification_service_settings(GroupHeaderCardWidget):
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setTitle(
+            get_content_name_async(
+                "roll_call_notification_settings",
+                "classisland_notification_service_settings",
+            )
+        )
+        self.setBorderRadius(8)
+
+        self.notification_service_type_combo_box = ComboBox()
+        self.notification_service_type_combo_box.addItems(
+            get_content_combo_name_async(
+                "roll_call_notification_settings", "notification_service_type"
+            )
+        )
+        self.notification_service_type_combo_box.setCurrentIndex(
+            readme_settings_async(
+                "roll_call_notification_settings", "notification_service_type"
+            )
+        )
+        self.notification_service_type_combo_box.currentIndexChanged.connect(
+            self._on_notification_service_type_changed
+        )
+
+        self.notification_display_duration_spinbox = SpinBox()
+        self.notification_display_duration_spinbox.setFixedWidth(WIDTH_SPINBOX)
+        self.notification_display_duration_spinbox.setRange(1, 60)
+        self.notification_display_duration_spinbox.setSuffix("s")
+        self.notification_display_duration_spinbox.setValue(
+            readme_settings_async(
+                "roll_call_notification_settings", "notification_display_duration"
+            )
+        )
+        self.notification_display_duration_spinbox.valueChanged.connect(
+            lambda: update_settings(
+                "roll_call_notification_settings",
+                "notification_display_duration",
+                self.notification_display_duration_spinbox.value(),
+            )
+        )
+
+        self.addGroup(
+            get_theme_icon("ic_fluent_cloud_20_filled"),
+            get_content_name_async(
+                "roll_call_notification_settings", "notification_service_type"
+            ),
+            get_content_description_async(
+                "roll_call_notification_settings", "notification_service_type"
+            ),
+            self.notification_service_type_combo_box,
+        )
+        self.addGroup(
+            get_theme_icon("ic_fluent_timer_20_filled"),
+            get_content_name_async(
+                "roll_call_notification_settings", "notification_display_duration"
+            ),
+            get_content_description_async(
+                "roll_call_notification_settings", "notification_display_duration"
+            ),
+            self.notification_display_duration_spinbox,
+        )
+
+    def _on_notification_service_type_changed(self, index):
+        update_settings(
+            "roll_call_notification_settings",
+            "notification_service_type",
+            index,
+        )
+        if index == 1 or index == 2:
+            hint_title = get_any_position_value_async(
+                "roll_call_notification_settings",
+                "classisland_notification_hint",
+                "title",
+            )
+            hint_content = get_any_position_value_async(
+                "roll_call_notification_settings",
+                "classisland_notification_hint",
+                "content",
+            )
+            InfoBar.success(
+                title=hint_title,
+                content=hint_content,
+                orient=Qt.Horizontal,
+                isClosable=True,
+                position=InfoBarPosition.TOP,
+                duration=5000,
+                parent=self,
+            )
+
+
+class quick_draw_classisland_notification_service_settings(GroupHeaderCardWidget):
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setTitle(
+            get_content_name_async(
+                "quick_draw_notification_settings",
+                "classisland_notification_service_settings",
+            )
+        )
+        self.setBorderRadius(8)
+
+        self.notification_service_type_combo_box = ComboBox()
+        self.notification_service_type_combo_box.addItems(
+            get_content_combo_name_async(
+                "quick_draw_notification_settings", "notification_service_type"
+            )
+        )
+        self.notification_service_type_combo_box.setCurrentIndex(
+            readme_settings_async(
+                "quick_draw_notification_settings", "notification_service_type"
+            )
+        )
+        self.notification_service_type_combo_box.currentIndexChanged.connect(
+            self._on_notification_service_type_changed
+        )
+
+        self.notification_display_duration_spinbox = SpinBox()
+        self.notification_display_duration_spinbox.setFixedWidth(WIDTH_SPINBOX)
+        self.notification_display_duration_spinbox.setRange(1, 60)
+        self.notification_display_duration_spinbox.setSuffix("s")
+        self.notification_display_duration_spinbox.setValue(
+            readme_settings_async(
+                "quick_draw_notification_settings", "notification_display_duration"
+            )
+        )
+        self.notification_display_duration_spinbox.valueChanged.connect(
+            lambda: update_settings(
+                "quick_draw_notification_settings",
+                "notification_display_duration",
+                self.notification_display_duration_spinbox.value(),
+            )
+        )
+
+        self.addGroup(
+            get_theme_icon("ic_fluent_cloud_20_filled"),
+            get_content_name_async(
+                "quick_draw_notification_settings", "notification_service_type"
+            ),
+            get_content_description_async(
+                "quick_draw_notification_settings", "notification_service_type"
+            ),
+            self.notification_service_type_combo_box,
+        )
+        self.addGroup(
+            get_theme_icon("ic_fluent_timer_20_filled"),
+            get_content_name_async(
+                "quick_draw_notification_settings", "notification_display_duration"
+            ),
+            get_content_description_async(
+                "quick_draw_notification_settings", "notification_display_duration"
+            ),
+            self.notification_display_duration_spinbox,
+        )
+
+    def _on_notification_service_type_changed(self, index):
+        update_settings(
+            "quick_draw_notification_settings",
+            "notification_service_type",
+            index,
+        )
+        if index == 1 or index == 2:
+            hint_title = get_any_position_value_async(
+                "quick_draw_notification_settings",
+                "classisland_notification_hint",
+                "title",
+            )
+            hint_content = get_any_position_value_async(
+                "quick_draw_notification_settings",
+                "classisland_notification_hint",
+                "content",
+            )
+            InfoBar.success(
+                title=hint_title,
+                content=hint_content,
+                orient=Qt.Horizontal,
+                isClosable=True,
+                position=InfoBarPosition.TOP,
+                duration=5000,
+                parent=self,
+            )
 
 
 class WelcomePage(QWidget):

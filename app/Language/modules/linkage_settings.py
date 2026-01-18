@@ -18,6 +18,10 @@ linkage_settings = {
             "name": "上课前提前解禁时间",
             "description": "在上课前多少秒提前解禁（0-1440秒）",
         },
+        "post_class_disable_delay": {
+            "name": "下课后延迟禁用时间",
+            "description": "下课后多少秒内延迟触发课间禁用（0-1440秒）",
+        },
         "cses_import": {
             "name": "课程表导入",
             "description": "从CSES格式文件导入上课时间段，用于课间禁用功能",
@@ -88,6 +92,12 @@ linkage_settings = {
             "name": "科目历史记录过滤",
             "description": "启用后，计算权重时只使用当前科目的历史记录",
         },
+        "break_subject_name": {"name": "课间"},
+        "subject_history_break_assignment": {
+            "name": "课间归属",
+            "description": "课间时段的科目历史记录归属到哪一类",
+            "combo_items": ["课间", "上节课", "下节课"],
+        },
         "data_source_settings": {
             "name": "数据源选择",
             "description": "设置课程数据源",
@@ -122,6 +132,10 @@ linkage_settings = {
         "pre_class_enable_time": {
             "name": "Pre-class enable time",
             "description": "How many seconds before class to enable (0-1440 seconds)",
+        },
+        "post_class_disable_delay": {
+            "name": "Post-class disable delay",
+            "description": "Delay class-break disable for N seconds after class ends (0-1440 seconds)",
         },
         "cses_import": {
             "name": "Schedule import",
@@ -206,6 +220,12 @@ linkage_settings = {
         "subject_history_filter_function": {
             "name": "Subject History Filter",
             "description": "When enabled, only use current subject's history records for weight calculation",
+        },
+        "break_subject_name": {"name": "Break"},
+        "subject_history_break_assignment": {
+            "name": "Break assignment",
+            "description": "Where to assign subject history during breaks",
+            "combo_items": ["Break", "Previous class", "Next class"],
         },
         "data_source_settings": {
             "name": "Data Source Selection",

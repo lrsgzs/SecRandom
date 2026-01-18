@@ -3,6 +3,7 @@ URL和IPC混合处理器 - 跨平台通用实现
 """
 
 import json
+import socket
 import threading
 from multiprocessing.connection import Client, Listener
 from pathlib import Path
@@ -103,7 +104,7 @@ class URLIPCHandler:
 
         try:
             address, family = self._get_ipc_address_for_name(self.ipc_name)
-            authkey = self._get_authkey(self.ipc_name)
+            authkey = None
 
             if family == "AF_UNIX":
                 try:
@@ -171,13 +172,22 @@ class URLIPCHandler:
 
     def _handle_connection(self, conn):
         try:
-            data = conn.recv_bytes()
+            if hasattr(conn, "_recv") and hasattr(conn, "_send"):
+                data = self._recv_line_from_conn(conn)
+            else:
+                data = conn.recv_bytes()
             if not data:
                 return
 
-            message = json.loads(data.decode("utf-8"))
+            message = json.loads(data.decode("utf-8").strip())
             response = self._process_message(message)
-            conn.send_bytes(json.dumps(response, ensure_ascii=False).encode("utf-8"))
+            response_bytes = (
+                json.dumps(response, ensure_ascii=False).encode("utf-8") + b"\n"
+            )
+            if hasattr(conn, "_send"):
+                self._send_line_to_conn(conn, response_bytes)
+            else:
+                conn.send_bytes(response_bytes)
         except EOFError:
             return
         except Exception as e:
@@ -187,6 +197,34 @@ class URLIPCHandler:
                 conn.close()
             except Exception:
                 pass
+
+    def _recv_line_from_conn(self, conn, max_bytes: int = 262144) -> bytes:
+        buf = bytearray()
+        try:
+            recv = getattr(conn, "_recv", None)
+            if recv is None:
+                return b""
+
+            while len(buf) < max_bytes:
+                try:
+                    chunk = recv(1)
+                except EOFError:
+                    break
+                if not chunk:
+                    break
+                buf += chunk
+                if chunk == b"\n":
+                    break
+        except Exception:
+            return b""
+
+        return bytes(buf)
+
+    def _send_line_to_conn(self, conn, data: bytes) -> None:
+        send = getattr(conn, "_send", None)
+        if send is None:
+            raise RuntimeError("IPC连接不支持原始发送")
+        send(data)
 
     def _process_message(self, message: Dict[str, Any]) -> Dict[str, Any]:
         """处理接收到的消息"""
@@ -288,19 +326,57 @@ class URLIPCHandler:
         try:
             target_name = self._normalize_ipc_name(target_ipc_name or self.ipc_name)
             address, family = self._get_ipc_address_for_name(target_name)
-            authkey = self._get_authkey(target_name)
-
-            conn = Client(address=address, family=family, authkey=authkey)
-            conn.send_bytes(json.dumps(message, ensure_ascii=False).encode("utf-8"))
-            response_data = conn.recv_bytes()
-            conn.close()
+            request_bytes = (
+                json.dumps(message, ensure_ascii=False).encode("utf-8") + b"\n"
+            )
+            response_data = self._send_stream_request(
+                address=address,
+                family=family,
+                request_bytes=request_bytes,
+                timeout=timeout,
+            )
 
             if not response_data:
                 return None
-            return json.loads(response_data.decode("utf-8"))
+            return json.loads(response_data.decode("utf-8").strip())
         except Exception as e:
             logger.exception(f"发送IPC消息失败: {e}")
             return None
+
+    def _send_stream_request(
+        self, address: str, family: str, request_bytes: bytes, timeout: float
+    ) -> Optional[bytes]:
+        if os.name == "nt":
+            conn = Client(address=address, family=family, authkey=None)
+            try:
+                conn.send_bytes(request_bytes)
+                response = conn.recv_bytes()
+                return response or None
+            finally:
+                try:
+                    conn.close()
+                except Exception:
+                    pass
+
+        if family != "AF_UNIX":
+            raise RuntimeError(f"不支持的IPC family: {family}")
+
+        sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+        try:
+            sock.settimeout(max(0.1, float(timeout)))
+            sock.connect(address)
+            sock.sendall(request_bytes)
+            sock_file = sock.makefile("rb")
+            try:
+                response = sock_file.readline()
+            finally:
+                sock_file.close()
+            return response or None
+        finally:
+            try:
+                sock.close()
+            except Exception:
+                pass
 
     def send_ipc_message_to_app(
         self,

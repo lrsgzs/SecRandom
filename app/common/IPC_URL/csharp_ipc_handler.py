@@ -24,7 +24,7 @@ try:
     clr.AddReference("SecRandom4Ci.Interface")
 
     # 导入程序集
-    from System import Action
+    from System import Action, DateTime
     from ClassIsland.Shared.Enums import TimeState
     from ClassIsland.Shared.IPC import IpcClient, IpcRoutedNotifyIds
     from ClassIsland.Shared.IPC.Abstractions.Services import IPublicLessonsService
@@ -69,6 +69,7 @@ if CSHARP_AVAILABLE:
             self.is_connected = False
             self._disconnect_logged = False  # 跟踪是否已记录断连日志
             self._last_on_class_left_log_time = 0  # 上次记录距离上课时间的时间
+            self._last_known_subject_name: Optional[str] = None
 
         def start_ipc_client(self) -> bool:
             """
@@ -195,7 +196,7 @@ if CSHARP_AVAILABLE:
 
                 return total_seconds
             except Exception as e:
-                logger.exception(f"获取距离上课时间失败: {e}")
+                logger.error(f"获取距离上课时间失败: {e}")
                 return 0
 
         def get_current_class_info(self) -> dict:
@@ -227,10 +228,11 @@ if CSHARP_AVAILABLE:
                     logger.debug("ClassIsland 当前没有课程")
                     return {}
                 logger.info(f"从 ClassIsland 获取当前课程: {class_name}")
+                self._last_known_subject_name = class_name
                 return {"name": class_name}
 
             except Exception as e:
-                logger.exception(f"从 ClassIsland 获取课程信息失败: {e}")
+                logger.error(f"从 ClassIsland 获取课程信息失败: {e}")
                 return {}
 
         def get_next_class_info(self) -> dict:
@@ -265,8 +267,44 @@ if CSHARP_AVAILABLE:
                 return {"name": class_name}
 
             except Exception as e:
-                logger.exception(f"从 ClassIsland 获取下一节课信息失败: {e}")
+                logger.error(f"从 ClassIsland 获取下一节课信息失败: {e}")
                 return {}
+
+        def get_previous_class_info(self) -> dict:
+            if not self._last_known_subject_name:
+                return {}
+            if self._last_known_subject_name.strip() == "???":
+                return {}
+            return {"name": self._last_known_subject_name}
+
+        def get_elapsed_since_previous_time_point_end_seconds(self) -> int:
+            try:
+                if not self.is_running or not self.is_connected:
+                    return 0
+
+                lessonSc = GeneratedIpcFactory.CreateIpcProxy[IPublicLessonsService](
+                    self.ipc_client.Provider, self.ipc_client.PeerProxy
+                )
+
+                current_index = int(lessonSc.CurrentSelectedIndex)
+                if current_index <= 0:
+                    return 0
+
+                class_plan = lessonSc.CurrentClassPlan
+                if not class_plan:
+                    return 0
+
+                valid_items = class_plan.ValidTimeLayoutItems
+                if not valid_items:
+                    return 0
+
+                previous_item = valid_items[current_index - 1]
+                end_time = previous_item.EndTime
+                elapsed = DateTime.Now.TimeOfDay - end_time
+                total_seconds = int(elapsed.TotalSeconds)
+                return max(0, total_seconds)
+            except Exception:
+                return 0
 
         @staticmethod
         def convert_to_call_result(
@@ -288,6 +326,13 @@ if CSHARP_AVAILABLE:
             lessonSc = GeneratedIpcFactory.CreateIpcProxy[IPublicLessonsService](
                 self.ipc_client.Provider, self.ipc_client.PeerProxy
             )
+            try:
+                if lessonSc.CurrentSubject and lessonSc.CurrentSubject.Name:
+                    name = str(lessonSc.CurrentSubject.Name)
+                    if name and name.strip() != "???":
+                        self._last_known_subject_name = name
+            except Exception:
+                pass
             logger.debug(
                 f"上课 {lessonSc.CurrentSubject.Name} 时间: {lessonSc.CurrentTimeLayoutItem}"
             )
@@ -431,6 +476,12 @@ else:
                       如果没有下一节课或获取失败，返回空字典
             """
             return {}
+
+        def get_previous_class_info(self) -> dict:
+            return {}
+
+        def get_elapsed_since_previous_time_point_end_seconds(self) -> int:
+            return 0
 
         @staticmethod
         def convert_to_call_result(

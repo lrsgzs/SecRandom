@@ -98,7 +98,7 @@ class MusicPlayer:
 
             music_path = get_audio_path(f"music/{music_file}")
             if not music_path.exists():
-                logger.exception(f"音乐文件不存在: {music_path}")
+                logger.error(f"音乐文件不存在: {music_path}")
                 return False
         except Exception as e:
             logger.exception(f"获取音乐文件路径失败: {e}")
@@ -217,9 +217,7 @@ class MusicPlayer:
                     channels = int(audio_file.channels)
                     if fs <= 0 or channels <= 0:
                         self._last_error = "Invalid audio format"
-                        logger.exception(
-                            f"音频文件参数无效: fs={fs}, channels={channels}"
-                        )
+                        logger.error(f"音频文件参数无效: fs={fs}, channels={channels}")
                         return
 
                     try:

@@ -3,11 +3,11 @@ URL处理工具 - 处理应用启动时的URL参数
 """
 
 import argparse
-import json
+import os
+import socket
 import threading
 from loguru import logger
 from typing import Optional, Dict, Any
-from multiprocessing.connection import Client
 from PySide6.QtCore import QObject, Signal
 from app.common.IPC_URL import URLIPCHandler
 from app.common.IPC_URL.url_command_handler import URLCommandHandler
@@ -91,30 +91,24 @@ class URLHandler(QObject):
                 address, family = self.url_ipc_handler._get_ipc_address_for_name(
                     self.url_ipc_handler.ipc_name
                 )
-                authkey = self.url_ipc_handler._get_authkey(
-                    self.url_ipc_handler.ipc_name
-                )
-
-                conn = Client(address=address, family=family, authkey=authkey)
-                conn.send_bytes(
-                    json.dumps(
-                        {"type": "ping", "payload": {}}, ensure_ascii=False
-                    ).encode("utf-8")
-                )
-                response_data = conn.recv_bytes()
-                conn.close()
-
-                if not response_data:
+                if os.name == "nt":
+                    with open(address, "r+b", buffering=0):
+                        result["ok"] = True
                     return
 
-                response = json.loads(response_data.decode("utf-8"))
-                if (
-                    isinstance(response, dict)
-                    and response.get("success") is True
-                    and response.get("type") == "ping"
-                    and response.get("result") == "pong"
-                ):
+                if family != "AF_UNIX":
+                    return
+
+                sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+                try:
+                    sock.settimeout(max(0.1, float(timeout)))
+                    sock.connect(address)
                     result["ok"] = True
+                finally:
+                    try:
+                        sock.close()
+                    except Exception:
+                        pass
             except Exception:
                 return
 

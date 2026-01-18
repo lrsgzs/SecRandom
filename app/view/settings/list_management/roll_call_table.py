@@ -175,9 +175,9 @@ class roll_call_table(GroupHeaderCardWidget):
             if hasattr(self, "table") and self.table is not None:
                 self.refresh_data()
         except RuntimeError as e:
-            logger.exception(f"刷新班级列表时发生错误: {e}")
+            logger.error(f"刷新班级列表时发生错误: {e}")
         except Exception as e:
-            logger.exception(f"刷新班级列表时发生未知错误: {e}")
+            logger.error(f"刷新班级列表时发生未知错误: {e}")
 
     def refresh_data(self):
         """刷新表格数据"""

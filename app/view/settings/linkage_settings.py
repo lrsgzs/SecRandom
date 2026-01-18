@@ -354,6 +354,23 @@ class class_break_settings(GroupHeaderCardWidget):
             )
         )
 
+        self.post_class_disable_delay_spinbox = SpinBox()
+        self.post_class_disable_delay_spinbox.setFixedWidth(WIDTH_SPINBOX)
+        self.post_class_disable_delay_spinbox.setRange(0, 1440)
+        self.post_class_disable_delay_spinbox.setSingleStep(1)
+        self.post_class_disable_delay_spinbox.setSuffix(" s")
+        post_class_disable_delay = readme_settings_async(
+            "linkage_settings", "post_class_disable_delay"
+        )
+        self.post_class_disable_delay_spinbox.setValue(post_class_disable_delay)
+        self.post_class_disable_delay_spinbox.valueChanged.connect(
+            lambda: update_settings(
+                "linkage_settings",
+                "post_class_disable_delay",
+                self.post_class_disable_delay_spinbox.value(),
+            )
+        )
+
         # 添加设置项到分组
         self.addGroup(
             get_theme_icon("ic_fluent_clock_lock_20_filled"),
@@ -372,6 +389,14 @@ class class_break_settings(GroupHeaderCardWidget):
             get_content_name_async("linkage_settings", "pre_class_enable_time"),
             get_content_description_async("linkage_settings", "pre_class_enable_time"),
             self.pre_class_enable_spinbox,
+        )
+        self.addGroup(
+            get_theme_icon("ic_fluent_timer_20_filled"),
+            get_content_name_async("linkage_settings", "post_class_disable_delay"),
+            get_content_description_async(
+                "linkage_settings", "post_class_disable_delay"
+            ),
+            self.post_class_disable_delay_spinbox,
         )
 
 
@@ -470,6 +495,32 @@ class subject_history_filter_settings(GroupHeaderCardWidget):
             )
         )
 
+        self.break_subject_assignment_combo = ComboBox()
+        self.break_subject_assignment_combo.setFixedWidth(WIDTH_SPINBOX)
+        self.break_subject_assignment_combo.addItems(
+            get_content_combo_name_async(
+                "linkage_settings", "subject_history_break_assignment"
+            )
+        )
+        self.break_subject_assignment_combo.setCurrentIndex(
+            readme_settings_async(
+                "linkage_settings", "subject_history_break_assignment"
+            )
+        )
+        self.break_subject_assignment_combo.currentIndexChanged.connect(
+            lambda: update_settings(
+                "linkage_settings",
+                "subject_history_break_assignment",
+                self.break_subject_assignment_combo.currentIndex(),
+            )
+        )
+        self.break_subject_assignment_combo.setEnabled(subject_history_filter_enabled)
+        self.subject_history_filter_switch.checkedChanged.connect(
+            lambda: self.break_subject_assignment_combo.setEnabled(
+                self.subject_history_filter_switch.isChecked()
+            )
+        )
+
         # 添加设置项到分组
         self.addGroup(
             get_theme_icon("ic_fluent_filter_20_filled"),
@@ -480,4 +531,14 @@ class subject_history_filter_settings(GroupHeaderCardWidget):
                 "linkage_settings", "subject_history_filter_function"
             ),
             self.subject_history_filter_switch,
+        )
+        self.addGroup(
+            get_theme_icon("ic_fluent_filter_20_filled"),
+            get_content_name_async(
+                "linkage_settings", "subject_history_break_assignment"
+            ),
+            get_content_description_async(
+                "linkage_settings", "subject_history_break_assignment"
+            ),
+            self.break_subject_assignment_combo,
         )
