@@ -45,6 +45,7 @@ class GuideWindow(FramelessWindow):
         self._initial_show_anim = None
         self._initial_show_animated = False
         self._guide_finished = False
+        self._prev_override_index = None
 
         # 底部导航栏
         self.bottomBar = QWidget(self)
@@ -289,6 +290,12 @@ class GuideWindow(FramelessWindow):
             self.close()
 
     def prev_page(self):
+        if self._prev_override_index is not None:
+            target = self._prev_override_index
+            self._prev_override_index = None
+            self._start_page_transition(target)
+            return
+
         prev_idx = self.current_index - 1
 
         if prev_idx >= 0:

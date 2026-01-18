@@ -356,6 +356,10 @@ class MigrationPage(QWidget):
         def _on_import_success():
             try:
                 w = self.window()
+                try:
+                    w._prev_override_index = w.pages.index(w.migrationPage)
+                except Exception:
+                    pass
                 last_index = len(w.pages) - 1
                 w._start_page_transition(last_index)
             except Exception:
