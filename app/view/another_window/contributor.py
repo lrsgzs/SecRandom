@@ -27,6 +27,7 @@ class contributor_page(QWidget):
         """初始化贡献者页面"""
         super().__init__(parent)
         self.setObjectName("contributor_page")
+        self._closing = False
 
         # 初始化UI组件
         self._init_ui()
@@ -35,7 +36,16 @@ class contributor_page(QWidget):
         self._init_data()
 
         # 延迟添加贡献者卡片
-        QTimer.singleShot(APP_INIT_DELAY, self.create_contributor_cards)
+        self._init_timer = QTimer(self)
+        self._init_timer.setSingleShot(True)
+        self._init_timer.timeout.connect(self.create_contributor_cards)
+        self._init_timer.start(APP_INIT_DELAY)
+        self._layout_timer = QTimer(self)
+        self._layout_timer.setSingleShot(True)
+        self._layout_timer.timeout.connect(self.update_layout)
+        self._resize_timer = QTimer(self)
+        self._resize_timer.setSingleShot(True)
+        self._resize_timer.timeout.connect(self._delayed_update_layout)
 
     def _init_ui(self):
         """初始化UI组件"""
@@ -174,6 +184,8 @@ class contributor_page(QWidget):
 
     def create_contributor_cards(self):
         """创建贡献者卡片"""
+        if self._closing:
+            return
         if not hasattr(self, "grid_layout") or self.grid_layout is None:
             return
 
@@ -184,7 +196,12 @@ class contributor_page(QWidget):
                 self.cards.append(card)
 
         # 延迟更新布局
-        QTimer.singleShot(50, self.update_layout)
+        try:
+            if self._layout_timer.isActive():
+                self._layout_timer.stop()
+        except Exception:
+            pass
+        self._layout_timer.start(50)
 
     def update_layout(self):
         """更新布局 - 根据窗口大小动态调整卡片排列"""
@@ -289,16 +306,15 @@ class contributor_page(QWidget):
     def resizeEvent(self, event):
         """窗口大小变化事件"""
         # 使用QTimer延迟布局更新，避免递归调用
-        if hasattr(self, "_resize_timer") and self._resize_timer is not None:
+        if self._resize_timer.isActive():
             self._resize_timer.stop()
-        self._resize_timer = QTimer()
-        self._resize_timer.setSingleShot(True)
-        self._resize_timer.timeout.connect(self._delayed_update_layout)
         self._resize_timer.start(50)
         super().resizeEvent(event)
 
     def _delayed_update_layout(self):
         """延迟更新布局"""
+        if self._closing:
+            return
         try:
             if hasattr(self, "grid_layout") and self.grid_layout is not None:
                 if self.isVisible():
@@ -308,9 +324,21 @@ class contributor_page(QWidget):
 
     def closeEvent(self, event):
         """窗口关闭事件"""
-        # 清理定时器
-        if hasattr(self, "_resize_timer") and self._resize_timer is not None:
-            self._resize_timer.stop()
-            self._resize_timer = None
+        self._closing = True
+        try:
+            if self._init_timer.isActive():
+                self._init_timer.stop()
+        except Exception:
+            pass
+        try:
+            if self._layout_timer.isActive():
+                self._layout_timer.stop()
+        except Exception:
+            pass
+        try:
+            if self._resize_timer.isActive():
+                self._resize_timer.stop()
+        except Exception:
+            pass
 
         super().closeEvent(event)

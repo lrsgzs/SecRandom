@@ -285,24 +285,33 @@ class MainWindow(FluentWindow):
                     update_settings("window", "height", height)
                     update_settings("window", "width", width)
 
+    def _show_main_window(self):
+        is_maximized = readme_settings_async("window", "is_maximized")
+        if self.isMinimized() or not self._has_been_shown:
+            self._position_window()
+
+        if is_maximized:
+            self.showMaximized()
+            return
+
+        self.showNormal()
+
     def toggle_window(self):
         """切换窗口显示状态
         在显示和隐藏状态之间切换窗口，切换时自动激活点名界面"""
+        if self.isMinimized():
+            self._show_main_window()
+            self.activateWindow()
+            self.raise_()
+            return
+
         if self.isVisible():
             self.hide()
-            if self.isMinimized():
-                self.showNormal()
-                self.activateWindow()
-                self.raise_()
-        else:
-            if self.isMinimized():
-                self.showNormal()
-                self.activateWindow()
-                self.raise_()
-            else:
-                self.show()
-                self.activateWindow()
-                self.raise_()
+            return
+
+        self._show_main_window()
+        self.activateWindow()
+        self.raise_()
 
     # ==================================================
     # 窗口事件处理
@@ -512,9 +521,7 @@ class MainWindow(FluentWindow):
         Args:
             page: 要切换到的页面对象
         """
-        if self.isMinimized():
-            self.showNormal()
-        self.show()
+        self._show_main_window()
         self.activateWindow()
         self.raise_()
         self.switchTo(page)
@@ -530,7 +537,7 @@ class MainWindow(FluentWindow):
         )
         if page_name == "main_window":
             logger.debug("MainWindow._handle_main_page_requested: 显示主窗口")
-            self.show()
+            self._show_main_window()
             self.raise_()
             self.activateWindow()
         elif (

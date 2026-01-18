@@ -711,3 +711,21 @@ class BackupManagerWindow(QWidget):
             )
 
         self._refresh_all()
+
+    def closeEvent(self, event):  # type: ignore[override]
+        try:
+            if self._worker is not None:
+                try:
+                    self._worker.finishedWithResult.disconnect(
+                        self._on_manual_backup_finished
+                    )
+                except Exception:
+                    pass
+                try:
+                    self._worker.finished.connect(self._worker.deleteLater)
+                except Exception:
+                    pass
+                self._worker = None
+        except Exception:
+            pass
+        super().closeEvent(event)

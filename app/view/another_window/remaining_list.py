@@ -257,6 +257,7 @@ class RemainingListPage(QWidget):
         self, parent: Optional[QWidget] = None, source: str = "roll_call"
     ) -> None:
         super().__init__(parent)
+        self._closing = False
         self.class_name = ""
         self.group_filter = ""
         self.gender_filter = ""
@@ -268,13 +269,18 @@ class RemainingListPage(QWidget):
         self.cards: List[CardWidget] = []
         self._loading_thread: Optional[StudentLoader] = None
 
-        QTimer.singleShot(APP_INIT_DELAY, self.load_data)
+        self._load_timer = QTimer(self)
+        self._load_timer.setSingleShot(True)
+        self._load_timer.timeout.connect(self.load_data)
+        self._load_timer.start(APP_INIT_DELAY)
 
         # 布局状态
         self._last_layout_width = 0
         self._last_card_count = 0
         self._layout_update_in_progress = False
-        self._resize_timer: Optional[QTimer] = None
+        self._resize_timer = QTimer(self)
+        self._resize_timer.setSingleShot(True)
+        self._resize_timer.timeout.connect(self._delayed_update_layout)
 
         # 缓存资源
         try:
@@ -296,6 +302,10 @@ class RemainingListPage(QWidget):
         if self._loading_thread is None:
             return
         try:
+            try:
+                self._loading_thread.finished.disconnect(self._on_students_loaded)
+            except Exception:
+                pass
             if self._loading_thread.isRunning():
                 self._loading_thread.requestInterruption()
                 self._loading_thread.wait(2000)
@@ -306,6 +316,17 @@ class RemainingListPage(QWidget):
             self._loading_thread = None
 
     def closeEvent(self, event) -> None:  # type: ignore[override]
+        self._closing = True
+        try:
+            if self._load_timer.isActive():
+                self._load_timer.stop()
+        except Exception:
+            pass
+        try:
+            if self._resize_timer.isActive():
+                self._resize_timer.stop()
+        except Exception:
+            pass
         self.stop_loader()
         super().closeEvent(event)
 
@@ -397,6 +418,8 @@ class RemainingListPage(QWidget):
         return None
 
     def load_data(self) -> None:
+        if self._closing:
+            return
         if not self.class_name:
             logger.debug("跳过剩余名单加载：class_name 为空")
             return
@@ -426,8 +449,11 @@ class RemainingListPage(QWidget):
         loader.start()
 
     def _on_students_loaded(self, students_list: List[Dict[str, Any]]) -> None:
+        if self._closing:
+            self._loading_thread = None
+            return
         self.students = list(students_list or [])
-        QTimer.singleShot(0, self.update_ui)
+        self.update_ui()
         self.count_changed.emit(self._calculate_remaining_count())
         self._loading_thread = None
 
@@ -637,9 +663,6 @@ class RemainingListPage(QWidget):
 
         if self._resize_timer is not None:
             self._resize_timer.stop()
-        self._resize_timer = QTimer()
-        self._resize_timer.setSingleShot(True)
-        self._resize_timer.timeout.connect(self._delayed_update_layout)
         self._resize_timer.start(200)
         super().resizeEvent(event)
 

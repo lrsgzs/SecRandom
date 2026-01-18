@@ -79,6 +79,7 @@ class SimpleWindowTemplate(FramelessWindow):
             parent: 父窗口
         """
         super().__init__(parent)
+        self.setAttribute(Qt.WidgetAttribute.WA_DeleteOnClose, True)
 
         # 保存父窗口引用
         self.parent_window = parent
@@ -480,5 +481,9 @@ class SimpleWindowTemplate(FramelessWindow):
 
     def closeEvent(self, event) -> None:
         """窗口关闭事件处理"""
+        try:
+            qconfig.themeChanged.disconnect(self._on_theme_changed)
+        except Exception:
+            pass
         self.windowClosed.emit()
         super().closeEvent(event)

@@ -204,9 +204,4 @@ class CurrentConfigViewerWindow(QWidget):
 
     def closeEvent(self, event):
         """处理窗口关闭事件"""
-        event.accept()
-
-    def close(self):
-        """关闭窗口"""
-        self.closeEvent(QCloseEvent())
-        super().close()
+        super().closeEvent(event)

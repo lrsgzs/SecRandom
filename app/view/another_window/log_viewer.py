@@ -20,6 +20,7 @@ class LogViewerWindow(QWidget):
     def __init__(self, parent=None):
         """初始化日志查看窗口"""
         super().__init__(parent)
+        self._closing = False
         self.current_log_file = None
         self.hidden_keywords = ("内幕", "behind")
         self.log_level_colors = {
@@ -29,9 +30,12 @@ class LogViewerWindow(QWidget):
             "ERROR": "#FF0000",
             "CRITICAL": "#8B0000",
         }
-        self.file_watcher = QFileSystemWatcher()
+        self.file_watcher = QFileSystemWatcher(self)
         self.init_ui()
-        QTimer.singleShot(0, self.load_log_files)
+        self._load_timer = QTimer(self)
+        self._load_timer.setSingleShot(True)
+        self._load_timer.timeout.connect(self.load_log_files)
+        self._load_timer.start(0)
 
     def init_ui(self):
         """初始化UI"""
@@ -112,6 +116,8 @@ class LogViewerWindow(QWidget):
     def load_log_files(self):
         """加载日志文件列表"""
         try:
+            if self._closing:
+                return
             # 获取日志目录
             log_dir = get_path(LOG_DIR)
             if not os.path.exists(log_dir):
@@ -163,6 +169,8 @@ class LogViewerWindow(QWidget):
 
     def on_directory_changed(self):
         """文件夹变化时的处理"""
+        if self._closing:
+            return
         QTimer.singleShot(100, self.load_log_files)
 
     def on_log_file_changed(self, index):
@@ -173,6 +181,8 @@ class LogViewerWindow(QWidget):
     def load_log_content(self, file_path):
         """加载日志内容"""
         try:
+            if self._closing:
+                return
             self.current_log_file = file_path
 
             # 添加文件监听
@@ -203,12 +213,16 @@ class LogViewerWindow(QWidget):
 
     def on_file_changed(self, file_path):
         """文件变化时的处理"""
+        if self._closing:
+            return
         if file_path == self.current_log_file:
             QTimer.singleShot(100, lambda: self.load_log_content(file_path))
 
     def filter_logs(self, lines=None):
         """过滤日志"""
         try:
+            if self._closing:
+                return
             # 如果没有提供 lines，则从文件读取
             if lines is None:
                 if not self.current_log_file or not os.path.exists(
@@ -418,9 +432,26 @@ class LogViewerWindow(QWidget):
 
     def closeEvent(self, event):
         """处理窗口关闭事件"""
-        event.accept()
-
-    def close(self):
-        """关闭窗口"""
-        self.closeEvent(QCloseEvent())
-        super().close()
+        self._closing = True
+        try:
+            if hasattr(self, "_load_timer") and self._load_timer.isActive():
+                self._load_timer.stop()
+        except Exception:
+            pass
+        try:
+            self.file_watcher.directoryChanged.disconnect(self.on_directory_changed)
+        except Exception:
+            pass
+        try:
+            self.file_watcher.fileChanged.disconnect(self.on_file_changed)
+        except Exception:
+            pass
+        try:
+            paths = list(self.file_watcher.files()) + list(
+                self.file_watcher.directories()
+            )
+            if paths:
+                self.file_watcher.removePaths(paths)
+        except Exception:
+            pass
+        super().closeEvent(event)
