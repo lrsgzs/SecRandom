@@ -3,7 +3,7 @@ import json
 import glob
 import shutil
 import zipfile
-from typing import Optional, Union
+from typing import Optional, Union, Callable
 from loguru import logger
 from pathlib import Path
 from datetime import datetime
@@ -1346,7 +1346,195 @@ def export_all_data(parent: Optional[QWidget] = None) -> None:
         dialog.exec()
 
 
-def import_all_data(parent: Optional[QWidget] = None) -> bool:
+def _show_import_all_data_failure(parent: Optional[QWidget], e: Exception) -> None:
+    logger.exception(f"导入所有数据失败: {e}")
+    dialog = MessageBox(
+        get_any_position_value_async(
+            "basic_settings", "data_import_export", "import_failure_title", "name"
+        ),
+        get_any_position_value_async(
+            "basic_settings", "data_import_export", "import_failure_content", "name"
+        ).format(error=str(e)),
+        parent,
+    )
+    dialog.yesButton.setText(
+        get_any_position_value_async(
+            "basic_settings", "data_import_export", "import_success_button", "name"
+        )
+    )
+    dialog.cancelButton.hide()
+    dialog.buttonLayout.insertStretch(1)
+    dialog.exec()
+
+
+def _show_import_all_data_success(
+    parent: Optional[QWidget],
+    skipped_files: list,
+    on_success: Optional[Callable[[], None]],
+) -> None:
+    success_dialog = MessageBox(
+        get_any_position_value_async(
+            "basic_settings", "data_import_export", "import_success_title", "name"
+        ),
+        (
+            get_any_position_value_async(
+                "basic_settings",
+                "data_import_export",
+                "import_success_content_skipped",
+                "name",
+            ).format(count=len(skipped_files))
+            if skipped_files
+            else get_any_position_value_async(
+                "basic_settings", "data_import_export", "import_success_content", "name"
+            )
+        ),
+        parent,
+    )
+    success_dialog.yesButton.setText(
+        get_any_position_value_async(
+            "basic_settings", "data_import_export", "import_success_button", "name"
+        )
+    )
+    success_dialog.cancelButton.hide()
+    success_dialog.buttonLayout.insertStretch(1)
+    success_dialog.exec()
+    if on_success:
+        try:
+            on_success()
+        except Exception:
+            pass
+
+
+def _format_existing_files_preview(existing_files: list) -> str:
+    files_list = "\n".join(existing_files[:10])
+    if len(existing_files) > 10:
+        files_list += get_any_position_value_async(
+            "basic_settings", "data_import_export", "existing_files_count", "name"
+        ).format(len=len(existing_files) - 10)
+    return files_list
+
+
+def _request_import_overwrite_confirmation(
+    parent: Optional[QWidget], existing_files: list, on_confirm: Callable[[], None]
+) -> None:
+    files_list = _format_existing_files_preview(existing_files)
+
+    def _apply() -> None:
+        dialog = MessageBox(
+            get_any_position_value_async(
+                "basic_settings", "data_import_export", "existing_files_title", "name"
+            ),
+            get_any_position_value_async(
+                "basic_settings", "data_import_export", "existing_files_content", "name"
+            ).format(files=files_list),
+            parent,
+        )
+        dialog.yesButton.setText(
+            get_any_position_value_async(
+                "basic_settings", "data_import_export", "import_confirm_button", "name"
+            )
+        )
+        dialog.cancelButton.setText(
+            get_any_position_value_async(
+                "basic_settings", "data_import_export", "import_cancel_button", "name"
+            )
+        )
+        if dialog.exec():
+            on_confirm()
+
+    require_and_run("import_overwrite", parent, _apply)
+
+
+def _request_import_version_mismatch_confirmation(
+    parent: Optional[QWidget],
+    software_name: str,
+    version: str,
+    current_version: str,
+    on_confirm: Callable[[], None],
+) -> None:
+    def _apply() -> None:
+        warning_dialog = MessageBox(
+            get_any_position_value_async(
+                "basic_settings", "data_import_export", "version_mismatch_title", "name"
+            ),
+            get_any_position_value_async(
+                "basic_settings",
+                "data_import_export",
+                "version_mismatch_content",
+                "name",
+            ).format(
+                software_name=software_name,
+                version=version,
+                current_version=current_version,
+            ),
+            parent,
+        )
+        warning_dialog.yesButton.setText(
+            get_any_position_value_async(
+                "basic_settings", "data_import_export", "import_confirm_button", "name"
+            )
+        )
+        warning_dialog.cancelButton.setText(
+            get_any_position_value_async(
+                "basic_settings", "data_import_export", "import_cancel_button", "name"
+            )
+        )
+        if warning_dialog.exec():
+            on_confirm()
+
+    require_and_run("import_version_mismatch", parent, _apply)
+
+
+def _perform_import_all_data_from_file(
+    file_path: str, parent: Optional[QWidget], on_success: Optional[Callable[[], None]]
+) -> None:
+    if not _confirm_import(parent):
+        return
+    try:
+        skipped_files = _extract_data_files(file_path)
+    except Exception as e:
+        _show_import_all_data_failure(parent, e)
+        return
+    _show_import_all_data_success(parent, skipped_files, on_success)
+
+
+def _start_import_all_data_flow(
+    file_path: str, parent: Optional[QWidget], on_success: Optional[Callable[[], None]]
+) -> None:
+    version_info = _check_version_info(file_path)
+    current_version = SPECIAL_VERSION
+    software_name = version_info.get("software_name", "") if version_info else ""
+    version = version_info.get("version", "") if version_info else ""
+
+    def _after_version_confirmed() -> None:
+        existing_files = _check_existing_files(file_path)
+        if existing_files:
+            _request_import_overwrite_confirmation(
+                parent,
+                existing_files,
+                lambda: _perform_import_all_data_from_file(
+                    file_path, parent, on_success
+                ),
+            )
+            return
+        _perform_import_all_data_from_file(file_path, parent, on_success)
+
+    if version_info and (software_name != "SecRandom" or version != current_version):
+        _request_import_version_mismatch_confirmation(
+            parent,
+            software_name,
+            version,
+            current_version,
+            _after_version_confirmed,
+        )
+        return
+
+    _after_version_confirmed()
+
+
+def import_all_data(
+    parent: Optional[QWidget] = None, on_success: Optional[Callable[[], None]] = None
+) -> bool:
     """从文件导入所有数据"""
     try:
         file_path, _ = QFileDialog.getOpenFileName(
@@ -1355,81 +1543,12 @@ def import_all_data(parent: Optional[QWidget] = None) -> bool:
             "",
             "ZIP Files (*.zip);;All Files (*)",
         )
-
         if not file_path:
             return False
-
-        version_info = _check_version_info(file_path)
-
-        if version_info:
-            if not _confirm_version_mismatch(version_info, parent):
-                return False
-
-        existing_files = _check_existing_files(file_path)
-        if existing_files and not _confirm_overwrite(existing_files, parent):
-            return False
-
-        if not _confirm_import(parent):
-            return False
-
-        skipped_files = _extract_data_files(file_path)
-
-        success_dialog = MessageBox(
-            get_any_position_value_async(
-                "basic_settings",
-                "data_import_export",
-                "import_success_title",
-                "name",
-            ),
-            (
-                get_any_position_value_async(
-                    "basic_settings",
-                    "data_import_export",
-                    "import_success_content_skipped",
-                    "name",
-                ).format(count=len(skipped_files))
-                if skipped_files
-                else get_any_position_value_async(
-                    "basic_settings",
-                    "data_import_export",
-                    "import_success_content",
-                    "name",
-                )
-            ),
-            parent,
-        )
-        success_dialog.yesButton.setText(
-            get_any_position_value_async(
-                "basic_settings",
-                "data_import_export",
-                "import_success_button",
-                "name",
-            )
-        )
-        success_dialog.cancelButton.hide()
-        success_dialog.buttonLayout.insertStretch(1)
-        success_dialog.exec()
+        _start_import_all_data_flow(file_path, parent, on_success)
         return True
-
     except Exception as e:
-        logger.exception(f"导入所有数据失败: {e}")
-        dialog = MessageBox(
-            get_any_position_value_async(
-                "basic_settings", "data_import_export", "import_failure_title", "name"
-            ),
-            get_any_position_value_async(
-                "basic_settings", "data_import_export", "import_failure_content", "name"
-            ).format(error=str(e)),
-            parent,
-        )
-        dialog.yesButton.setText(
-            get_any_position_value_async(
-                "basic_settings", "data_import_export", "import_success_button", "name"
-            )
-        )
-        dialog.cancelButton.hide()
-        dialog.buttonLayout.insertStretch(1)
-        dialog.exec()
+        _show_import_all_data_failure(parent, e)
         return False
 
 
@@ -1444,59 +1563,6 @@ def _check_version_info(file_path: str) -> dict:
     except Exception as e:
         logger.warning(f"读取版本信息失败: {e}")
     return version_info
-
-
-def _confirm_version_mismatch(version_info: dict, parent: Optional[QWidget]) -> bool:
-    """确认版本不匹配"""
-    software_name = version_info.get("software_name", "")
-    version = version_info.get("version", "")
-    current_version = SPECIAL_VERSION
-
-    if software_name != "SecRandom" or version != current_version:
-
-        def _apply_version_mismatch():
-            warning_dialog = MessageBox(
-                get_any_position_value_async(
-                    "basic_settings",
-                    "data_import_export",
-                    "version_mismatch_title",
-                    "name",
-                ),
-                get_any_position_value_async(
-                    "basic_settings",
-                    "data_import_export",
-                    "version_mismatch_content",
-                    "name",
-                ).format(
-                    software_name=software_name,
-                    version=version,
-                    current_version=current_version,
-                ),
-                parent,
-            )
-            warning_dialog.yesButton.setText(
-                get_any_position_value_async(
-                    "basic_settings",
-                    "data_import_export",
-                    "import_confirm_button",
-                    "name",
-                )
-            )
-            warning_dialog.cancelButton.setText(
-                get_any_position_value_async(
-                    "basic_settings",
-                    "data_import_export",
-                    "import_cancel_button",
-                    "name",
-                )
-            )
-            return warning_dialog.exec()
-
-        return require_and_run(
-            "import_version_mismatch", parent, _apply_version_mismatch
-        )
-
-    return True
 
 
 def _check_existing_files(file_path: str) -> list:
@@ -1529,39 +1595,6 @@ def _check_existing_files(file_path: str) -> list:
                         existing_files.append(str(target_path))
 
     return existing_files
-
-
-def _confirm_overwrite(existing_files: list, parent: Optional[QWidget]) -> bool:
-    """确认覆盖文件"""
-    files_list = "\n".join(existing_files[:10])
-    if len(existing_files) > 10:
-        files_list += get_any_position_value_async(
-            "basic_settings", "data_import_export", "existing_files_count", "name"
-        ).format(len=len(existing_files) - 10)
-
-    def _apply_overwrite():
-        dialog = MessageBox(
-            get_any_position_value_async(
-                "basic_settings", "data_import_export", "existing_files_title", "name"
-            ),
-            get_any_position_value_async(
-                "basic_settings", "data_import_export", "existing_files_content", "name"
-            ).format(files=files_list),
-            parent,
-        )
-        dialog.yesButton.setText(
-            get_any_position_value_async(
-                "basic_settings", "data_import_export", "import_confirm_button", "name"
-            )
-        )
-        dialog.cancelButton.setText(
-            get_any_position_value_async(
-                "basic_settings", "data_import_export", "import_cancel_button", "name"
-            )
-        )
-        return dialog.exec()
-
-    return require_and_run("import_overwrite", parent, _apply_overwrite)
 
 
 def _confirm_import(parent: Optional[QWidget]) -> bool:

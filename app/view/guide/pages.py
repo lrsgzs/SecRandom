@@ -353,14 +353,16 @@ class MigrationPage(QWidget):
         self.vBoxLayout.addWidget(self.importBtn, 0, Qt.AlignmentFlag.AlignCenter)
 
     def _manual_import(self):
-        ok = import_all_data(self)
+        def _on_import_success():
+            try:
+                w = self.window()
+                last_index = len(w.pages) - 1
+                w._start_page_transition(last_index)
+            except Exception:
+                return
+
+        ok = import_all_data(self, on_success=_on_import_success)
         if not ok:
-            return
-        try:
-            w = self.window()
-            last_index = len(w.pages) - 1
-            w._start_page_transition(last_index)
-        except Exception:
             return
 
 

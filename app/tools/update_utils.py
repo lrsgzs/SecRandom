@@ -486,14 +486,18 @@ async def get_metadata_info_async() -> dict | None:
             return None
 
 
-def get_metadata_info() -> dict | None:
-    """
-    获取 metadata.yaml 文件信息（同步版本）
-
-    Returns:
-        dict: metadata.yaml 文件的内容，如果读取失败则返回 None
-    """
-    return _run_async_func(get_metadata_info_async)
+def _render_update_filename(
+    name_format: str,
+    version: str,
+    arch: str,
+    system: str = SYSTEM,
+    struct: str = STRUCT,
+) -> str:
+    file_name = name_format.replace("[system]", system)
+    file_name = file_name.replace("[version]", version)
+    file_name = file_name.replace("[arch]", arch)
+    file_name = file_name.replace("[struct]", struct)
+    return file_name
 
 
 async def get_latest_version_async(channel: int | None = None) -> dict | None:
@@ -730,7 +734,6 @@ async def get_update_download_url_async(
 
 async def download_update_async(
     version: str,
-    arch: str = ARCH,
     progress_callback: Optional[Callable] = None,
     timeout: int = 300,
     cancel_check: Optional[Callable[[], bool]] = None,
@@ -739,10 +742,7 @@ async def download_update_async(
     异步下载更新文件
 
     Args:
-        version (str): 版本号，格式为 "vX.X.X.X"
-        system (str, optional): 系统，默认为当前系统
-        arch (str, optional): 架构，默认为当前架构
-        struct (str, optional): 结构，默认为当前结构
+        version (str): 版本号，格式为 "vX.X.X"
         progress_callback (Optional[Callable]): 进度回调函数，接收已下载字节数和总字节数
         timeout (int, optional): 下载超时时间（秒），默认300秒
         cancel_check (Optional[Callable[[], bool]]): 取消检查函数，返回True表示取消下载
@@ -750,12 +750,22 @@ async def download_update_async(
     Returns:
         Optional[str]: 下载完成的文件路径，如果下载失败则返回 None
     """
-    # 从 metadata.yaml 获取文件名格式
-    name_format = "SecRandom-setup-[version]-[arch].exe"
+    metadata = await get_metadata_info_async()
+
+    name_format = None
+    if isinstance(metadata, dict):
+        name_format = metadata.get("name_format")
+    if not isinstance(name_format, str) or not name_format.strip():
+        name_format = "SecRandom-setup-[version]-[arch].exe"
 
     # 替换占位符生成实际文件名
-    file_name = name_format.replace("[version]", version)
-    file_name = file_name.replace("[arch]", arch)
+    file_name = _render_update_filename(
+        name_format,
+        version=version,
+        arch=metadata.get("arch", ARCH),
+        system=metadata.get("system", SYSTEM),
+        struct=metadata.get("struct", STRUCT),
+    )
 
     # 确定下载保存路径
     download_dir = get_data_path("downloads")
@@ -828,7 +838,7 @@ async def download_update_async(
                                 progress_callback(downloaded_size, total_size)
 
             # 验证下载的文件完整性
-            if not check_update_file_integrity(file_path, "zip"):
+            if not check_update_file_integrity(str(file_path)):
                 logger.warning(f"下载的文件不完整或已损坏: {file_path}")
                 # 删除损坏的文件
                 if file_path.exists():
@@ -883,7 +893,6 @@ def download_update(
     return _run_async_func(
         download_update_async,
         version,
-        arch,
         progress_callback,
         timeout,
         cancel_check,
