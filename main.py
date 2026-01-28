@@ -344,7 +344,7 @@ def restart_application(program_dir):
     """
     import subprocess
     import platform
-    
+
     logger.info("检测到重启信号，正在重启应用程序...")
     filtered_args = [arg for arg in sys.argv if not arg.startswith("--")]
 
@@ -359,7 +359,7 @@ def restart_application(program_dir):
 
     try:
         os.chdir(program_dir)
-        
+
         # Windows 平台使用 subprocess.Popen 启动新进程
         if platform.system() == "Windows":
             try:

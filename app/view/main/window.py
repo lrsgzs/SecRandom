@@ -1,9 +1,6 @@
 # ==================================================
 # 导入库
 # ==================================================
-import os
-import sys
-import loguru
 from loguru import logger
 from PySide6.QtWidgets import QApplication, QWidget
 from PySide6.QtGui import QIcon
