@@ -342,6 +342,9 @@ def restart_application(program_dir):
     Args:
         program_dir: 程序目录路径
     """
+    import subprocess
+    import platform
+    
     logger.info("检测到重启信号，正在重启应用程序...")
     filtered_args = [arg for arg in sys.argv if not arg.startswith("--")]
 
@@ -356,7 +359,26 @@ def restart_application(program_dir):
 
     try:
         os.chdir(program_dir)
-        os.execl(executable, executable, *filtered_args)
+        
+        # Windows 平台使用 subprocess.Popen 启动新进程
+        if platform.system() == "Windows":
+            try:
+                startup_info = subprocess.STARTUPINFO()
+                startup_info.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+                subprocess.Popen(
+                    [executable] + filtered_args,
+                    cwd=program_dir,
+                    creationflags=subprocess.CREATE_NEW_PROCESS_GROUP | subprocess.DETACHED_PROCESS,
+                    startupinfo=startup_info,
+                )
+                logger.info("Windows 平台：新进程已启动")
+            except Exception as e:
+                logger.exception(f"Windows 平台启动新进程失败: {e}")
+                os._exit(1)
+        else:
+            # Linux/Unix 平台使用 os.execl 替换当前进程
+            logger.info("Linux 平台：使用 execl 重启应用程序")
+            os.execl(executable, executable, *filtered_args)
     except Exception as e:
         logger.exception(f"重启应用程序失败: {e}")
         os._exit(1)
