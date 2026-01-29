@@ -10,6 +10,11 @@ if os.name == "nt":
     from ctypes import wintypes
 else:
     # Create a dummy wintypes module for non-Windows platforms
+    # NOTE: These dummy types are ONLY for import compatibility and type hints.
+    # They should NEVER be instantiated at runtime because:
+    # 1. All functions using wintypes check _is_windows() first and return early
+    # 2. The dummy types lack ctypes-specific attributes like .value
+    # This design is safe because non-Windows code paths never reach wintypes usage
     class _DummyWinTypes:
         DWORD = int
         BOOL = bool
