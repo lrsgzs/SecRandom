@@ -1,11 +1,30 @@
 import os
 import sys
 import ctypes
-from ctypes import wintypes
 from subprocess import list2cmdline
-from app.tools.path_utils import get_data_path
 
 from loguru import logger
+
+# Only import wintypes on Windows to avoid import errors on other platforms
+if os.name == "nt":
+    from ctypes import wintypes
+else:
+    # Create a dummy wintypes module for non-Windows platforms
+    # NOTE: These dummy types are ONLY for import compatibility and type hints.
+    # They should NEVER be instantiated at runtime because:
+    # 1. All functions using wintypes check _is_windows() first and return early
+    # 2. The dummy types lack ctypes-specific attributes like .value
+    # This design is safe because non-Windows code paths never reach wintypes usage
+    class _DummyWinTypes:
+        DWORD = int
+        BOOL = bool
+        HWND = int
+        LPCWSTR = str
+        UINT = int
+        
+    wintypes = _DummyWinTypes()
+
+from app.tools.path_utils import get_data_path
 
 _uiaccess_dll = None
 _user32 = None
