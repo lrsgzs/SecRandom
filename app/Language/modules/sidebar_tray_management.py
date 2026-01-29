@@ -30,6 +30,14 @@ floating_window_management = {
             "name": "已切换为UIA置顶模式，需要重启生效，是否立即重启？",
             "description": "UIA置顶切换后重启提示内容",
         },
+        "uia_topmost_disable_restart_dialog_content": {
+            "name": "已关闭UIA置顶模式，需要完全退出软件后重新启动才会生效",
+            "description": "关闭UIA置顶后提示内容",
+        },
+        "uia_topmost_disable_restart_dialog_ok_btn": {
+            "name": "知道了",
+            "description": "关闭UIA置顶后提示按钮文本",
+        },
         "uia_topmost_restart_dialog_restart_btn": {
             "name": "重启",
             "description": "UIA置顶切换后重启按钮文本",
@@ -141,6 +149,14 @@ floating_window_management = {
         "uia_topmost_restart_dialog_content": {
             "name": "UIA topmost mode has been enabled. Restart now to apply changes?",
             "description": "Restart dialog content after switching UIA topmost",
+        },
+        "uia_topmost_disable_restart_dialog_content": {
+            "name": "UIA topmost mode has been disabled. Fully exit the app and relaunch to apply.",
+            "description": "Hint content after disabling UIA topmost",
+        },
+        "uia_topmost_disable_restart_dialog_ok_btn": {
+            "name": "OK",
+            "description": "OK button text after disabling UIA topmost",
         },
         "uia_topmost_restart_dialog_restart_btn": {
             "name": "Restart",

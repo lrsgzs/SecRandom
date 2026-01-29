@@ -296,6 +296,41 @@ class floating_window_basic_settings(GroupHeaderCardWidget):
                 "floating_window_management", "floating_window_topmost_mode"
             )
         )
+        if previous_index == 2 and index != 2:
+            dialog = MessageBox(
+                get_content_name_async(
+                    "floating_window_management", "uia_topmost_restart_dialog_title"
+                ),
+                get_content_name_async(
+                    "floating_window_management",
+                    "uia_topmost_disable_restart_dialog_content",
+                ),
+                self.window(),
+            )
+            dialog.yesButton.setText(
+                get_content_name_async(
+                    "floating_window_management",
+                    "uia_topmost_disable_restart_dialog_ok_btn",
+                )
+            )
+            dialog.cancelButton.setText(
+                get_content_name_async(
+                    "floating_window_management",
+                    "uia_topmost_restart_dialog_cancel_btn",
+                )
+            )
+            if dialog.exec():
+                update_settings(
+                    "floating_window_management", "floating_window_topmost_mode", index
+                )
+            else:
+                blocker = QSignalBlocker(self.floating_window_topmost_mode_combo_box)
+                self.floating_window_topmost_mode_combo_box.setCurrentIndex(
+                    previous_index
+                )
+                del blocker
+            return
+
         if index == 2 and previous_index != 2:
             dialog = MessageBox(
                 get_content_name_async(
