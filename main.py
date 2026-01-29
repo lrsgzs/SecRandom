@@ -360,14 +360,33 @@ def restart_application(program_dir):
         if platform.system() == "Windows":
             try:
                 from app.common.windows.uiaccess import (
+                    ELEVATE_RESTART_ENV,
                     UIACCESS_RESTART_ENV,
+                    UIACCESS_RESTART_ARG,
+                    start_elevated_process,
                     start_uiaccess_process,
                 )
 
                 need_uiaccess = bool(os.environ.pop(UIACCESS_RESTART_ENV, "") == "1")
+                need_elevated = bool(os.environ.pop(ELEVATE_RESTART_ENV, "") == "1")
             except Exception:
                 need_uiaccess = False
+                need_elevated = False
                 start_uiaccess_process = None
+                start_elevated_process = None
+                UIACCESS_RESTART_ARG = None
+
+            if need_elevated and start_elevated_process is not None:
+                cmd = [executable] + filtered_args
+                if need_uiaccess and UIACCESS_RESTART_ARG:
+                    cmd.append(str(UIACCESS_RESTART_ARG))
+                try:
+                    time.sleep(max(0.8, float(PROCESS_EXIT_WAIT_SECONDS or 0)))
+                except Exception:
+                    time.sleep(0.8)
+                if bool(start_elevated_process(cmd, cwd=program_dir)):
+                    logger.info("Windows 平台：已请求管理员启动新进程")
+                    os._exit(0)
 
             if need_uiaccess and start_uiaccess_process is not None:
                 cmd = [executable] + filtered_args
@@ -457,6 +476,28 @@ def handle_exit(
 
 def main():
     """主程序入口"""
+    try:
+        if platform.system() == "Windows":
+            from app.common.windows.uiaccess import (
+                UIACCESS_RESTART_ARG,
+                is_uiaccess_process,
+            )
+
+            if UIACCESS_RESTART_ARG in sys.argv:
+                try:
+                    while UIACCESS_RESTART_ARG in sys.argv:
+                        sys.argv.remove(UIACCESS_RESTART_ARG)
+                except Exception:
+                    pass
+
+                if not bool(is_uiaccess_process()):
+                    try:
+                        wm.pending_uiaccess_restart_after_show = True
+                    except Exception:
+                        pass
+    except Exception:
+        pass
+
     program_dir, shared_memory, is_first_instance = initialize_application()
 
     if not is_first_instance:

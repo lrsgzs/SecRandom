@@ -35,7 +35,7 @@ floating_window_management = {
             "description": "UIA置顶切换后重启按钮文本",
         },
         "uia_topmost_restart_dialog_cancel_btn": {
-            "name": "稍后",
+            "name": "取消",
             "description": "UIA置顶切换后取消按钮文本",
         },
         "reset_floating_window_position_button": {
@@ -147,7 +147,7 @@ floating_window_management = {
             "description": "Restart button text after switching UIA topmost",
         },
         "uia_topmost_restart_dialog_cancel_btn": {
-            "name": "Later",
+            "name": "Cancel",
             "description": "Cancel button text after switching UIA topmost",
         },
         "reset_floating_window_position_button": {

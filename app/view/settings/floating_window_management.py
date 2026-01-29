@@ -2,6 +2,9 @@
 # 导入库
 # ==================================================
 
+import os
+import ctypes
+
 from PySide6.QtWidgets import *
 from PySide6.QtGui import *
 from PySide6.QtCore import *
@@ -315,11 +318,25 @@ class floating_window_basic_settings(GroupHeaderCardWidget):
                     "uia_topmost_restart_dialog_cancel_btn",
                 )
             )
-
             if dialog.exec():
                 update_settings(
                     "floating_window_management", "floating_window_topmost_mode", index
                 )
+                try:
+                    from app.common.windows.uiaccess import (
+                        ELEVATE_RESTART_ENV,
+                        UIACCESS_RESTART_ENV,
+                    )
+
+                    os.environ[str(UIACCESS_RESTART_ENV)] = "1"
+                    try:
+                        is_admin = bool(ctypes.windll.shell32.IsUserAnAdmin())
+                    except Exception:
+                        is_admin = False
+                    if not is_admin:
+                        os.environ[str(ELEVATE_RESTART_ENV)] = "1"
+                except Exception:
+                    pass
                 QApplication.exit(EXIT_CODE_RESTART)
             else:
                 blocker = QSignalBlocker(self.floating_window_topmost_mode_combo_box)

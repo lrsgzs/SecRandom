@@ -187,6 +187,13 @@ class LevitationWindow(QWidget):
                 os.environ[str(env_key)] = "1"
             except Exception:
                 pass
+        try:
+            if not bool(self._is_admin()):
+                from app.common.windows.uiaccess import ELEVATE_RESTART_ENV
+
+                os.environ[str(ELEVATE_RESTART_ENV)] = "1"
+        except Exception:
+            pass
 
         app = QApplication.instance()
         if app is not None:
@@ -471,11 +478,6 @@ class LevitationWindow(QWidget):
         self._topmost_mode = self._get_int_setting(
             "floating_window_management", "floating_window_topmost_mode", 1
         )
-        if self._topmost_mode == 2 and not self._is_admin():
-            self._topmost_mode = 1
-            update_settings(
-                "floating_window_management", "floating_window_topmost_mode", 1
-            )
         self._refresh_window_flags()
 
         # 贴边隐藏功能配置
@@ -1791,14 +1793,6 @@ class LevitationWindow(QWidget):
                 self.setWindowOpacity(self._opacity)
             elif second == "floating_window_topmost_mode":
                 mode = int(value or 0)
-                if mode == 2 and not self._is_admin():
-                    self._topmost_mode = 1
-                    update_settings(
-                        "floating_window_management", "floating_window_topmost_mode", 1
-                    )
-                    self._refresh_window_flags()
-                    self._apply_topmost_runtime()
-                    return
                 self._topmost_mode = mode
                 self._refresh_window_flags()
                 self._apply_topmost_runtime()

@@ -21,7 +21,7 @@ else:
         HWND = int
         LPCWSTR = str
         UINT = int
-        
+
     wintypes = _DummyWinTypes()
 
 from app.tools.path_utils import get_data_path
@@ -31,6 +31,8 @@ _user32 = None
 _kernel32 = None
 
 UIACCESS_RESTART_ENV = "SECRANDOM_RESTART_UIACCESS"
+ELEVATE_RESTART_ENV = "SECRANDOM_RESTART_ELEVATED"
+UIACCESS_RESTART_ARG = "--secrandom-uiaccess"
 
 
 def _is_windows() -> bool:
@@ -197,4 +199,36 @@ def set_window_band_uiaccess(hwnd: int) -> bool:
         flags = SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE | SWP_SHOWWINDOW
         return bool(user32.SetWindowPos(h, hwnd_topmost, 0, 0, 0, 0, flags))
     except Exception:
+        return False
+
+
+def start_elevated_process(cmd_list: list[str], cwd: str | None = None) -> bool:
+    if not _is_windows():
+        return False
+    if not cmd_list:
+        return False
+    executable = str(cmd_list[0] or "").strip()
+    if not executable:
+        return False
+
+    params = list2cmdline(list(cmd_list[1:])) if len(cmd_list) > 1 else ""
+    directory = str(cwd) if cwd else None
+    try:
+        shell32 = ctypes.windll.shell32
+        shell32.ShellExecuteW.argtypes = [
+            wintypes.HWND,
+            wintypes.LPCWSTR,
+            wintypes.LPCWSTR,
+            wintypes.LPCWSTR,
+            wintypes.LPCWSTR,
+            ctypes.c_int,
+        ]
+        shell32.ShellExecuteW.restype = wintypes.HINSTANCE
+        rc = int(shell32.ShellExecuteW(None, "runas", executable, params, directory, 1))
+        if rc <= 32:
+            logger.debug("请求管理员启动失败: rc={}", rc)
+            return False
+        return True
+    except Exception as e:
+        logger.debug("请求管理员启动异常: {}", e)
         return False
