@@ -1,6 +1,7 @@
 # 标准库导入
 import ctypes
 import os
+import time
 from typing import Dict, Any
 
 # 第三方库导入
@@ -924,7 +925,7 @@ class LevitationWindow(QWidget):
             if not self._draggable:
                 return  # 如果不可拖动，直接返回
             self._press_pos = e.globalPosition().toPoint()
-            self._press_time = e.timestamp()  # 记录鼠标按下时间戳
+            self._press_time = int(time.monotonic() * 1000)
             self._dragging = False
             self._drag_timer.stop()
             self._drag_timer.start(self._long_press_ms)
@@ -952,7 +953,9 @@ class LevitationWindow(QWidget):
             if not self._dragging:
                 delta = cur - self._press_pos
                 press_duration = (
-                    e.timestamp() - self._press_time if self._press_time > 0 else 0
+                    int(time.monotonic() * 1000) - self._press_time
+                    if self._press_time > 0
+                    else 0
                 )
                 if self._should_start_drag(delta, press_duration):
                     self._begin_drag()
@@ -1018,7 +1021,7 @@ class LevitationWindow(QWidget):
                 # 如果不可拖动，不启动拖动计时器
                 return False
             self._press_pos = event.globalPosition().toPoint()
-            self._press_time = event.timestamp()  # 记录时间戳
+            self._press_time = int(time.monotonic() * 1000)
             self._dragging = False
             self._drag_timer.stop()
             self._drag_timer.start(self._long_press_ms)
@@ -1040,7 +1043,9 @@ class LevitationWindow(QWidget):
             if not self._dragging:
                 delta = cur - self._press_pos
                 press_duration = (
-                    event.timestamp() - self._press_time if self._press_time > 0 else 0
+                    int(time.monotonic() * 1000) - self._press_time
+                    if self._press_time > 0
+                    else 0
                 )
                 if self._should_start_drag(delta, press_duration):
                     self._begin_drag()
