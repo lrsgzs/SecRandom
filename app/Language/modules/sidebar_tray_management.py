@@ -90,6 +90,14 @@ floating_window_management = {
             "description": "设置浮窗中控件显示样式",
             "combo_items": ["图标+文字", "图标", "文字"],
         },
+        "floating_window_theme": {
+            "name": "浮窗主题",
+            "description": "设置浮窗主题（可跟随软件全局或单独设置）",
+        },
+        "floating_window_theme_follow_global": {
+            "name": "跟随软件全局",
+            "description": "浮窗主题选项：跟随软件全局主题",
+        },
         "floating_window_stick_to_edge": {
             "name": "贴边功能",
             "description": "控制浮窗是否自动贴边",
@@ -250,6 +258,14 @@ floating_window_management = {
             "name": "Floating window style",
             "description": "Configure style of buttons in floating window",
             "combo_items": {"0": "Icon + Text", "1": "Icon only", "2": "Text only"},
+        },
+        "floating_window_theme": {
+            "name": "Floating window theme",
+            "description": "Set floating window theme (follow global or override)",
+        },
+        "floating_window_theme_follow_global": {
+            "name": "Follow global",
+            "description": "Floating window theme option: follow app global theme",
         },
         "floating_window_stick_to_edge": {
             "name": "Edge function",

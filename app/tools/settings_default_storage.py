@@ -251,6 +251,7 @@ DEFAULT_SETTINGS = {
         "floating_window_button_control": {"default_value": 3},
         "floating_window_placement": {"default_value": 1},
         "floating_window_display_style": {"default_value": 0},
+        "floating_window_theme": {"default_value": 0},
         "floating_window_stick_to_edge": {"default_value": True},
         "floating_window_stick_to_edge_recover_seconds": {"default_value": 3},
         "floating_window_long_press_duration": {"default_value": 500},

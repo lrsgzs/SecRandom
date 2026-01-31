@@ -483,6 +483,30 @@ class floating_window_appearance_settings(GroupHeaderCardWidget):
             self.floating_window_size_combo_box_changed
         )
 
+        self.floating_window_theme_combo_box = ComboBox()
+        follow_global_text = get_content_name_async(
+            "floating_window_management", "floating_window_theme_follow_global"
+        )
+        basic_theme_items = get_content_combo_name_async("basic_settings", "theme")
+        if isinstance(basic_theme_items, list):
+            basic_theme_items = basic_theme_items[:-1]
+        else:
+            basic_theme_items = []
+        self.floating_window_theme_combo_box.addItems(
+            [follow_global_text] + list(basic_theme_items)
+        )
+        self.floating_window_theme_combo_box.setCurrentIndex(
+            int(
+                readme_settings_async(
+                    "floating_window_management", "floating_window_theme"
+                )
+                or 0
+            )
+        )
+        self.floating_window_theme_combo_box.currentIndexChanged.connect(
+            self.floating_window_theme_combo_box_changed
+        )
+
         # 添加设置项到分组
         self.addGroup(
             get_theme_icon("ic_fluent_button_20_filled"),
@@ -524,6 +548,16 @@ class floating_window_appearance_settings(GroupHeaderCardWidget):
             ),
             self.floating_window_size_combo_box,
         )
+        self.addGroup(
+            get_theme_icon("ic_fluent_dark_theme_20_filled"),
+            get_content_name_async(
+                "floating_window_management", "floating_window_theme"
+            ),
+            get_content_description_async(
+                "floating_window_management", "floating_window_theme"
+            ),
+            self.floating_window_theme_combo_box,
+        )
 
     def floating_window_button_control_combo_box_changed(self, index):
         update_settings(
@@ -545,6 +579,10 @@ class floating_window_appearance_settings(GroupHeaderCardWidget):
 
     def floating_window_size_combo_box_changed(self, index):
         update_settings("floating_window_management", "floating_window_size", index)
+        self.appearance_settings_changed.emit()
+
+    def floating_window_theme_combo_box_changed(self, index):
+        update_settings("floating_window_management", "floating_window_theme", index)
         self.appearance_settings_changed.emit()
 
 

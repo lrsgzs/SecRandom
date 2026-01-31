@@ -1,5 +1,6 @@
 # 标准库导入
 import ctypes
+import json
 import os
 import time
 from typing import Dict, Any
@@ -20,7 +21,7 @@ from app.tools.settings_access import (
     get_settings_signals,
 )
 from app.tools.path_utils import *
-from app.tools.variable import EXIT_CODE_RESTART
+from app.tools.variable import EXIT_CODE_RESTART, DEFAULT_ICON_CODEPOINT
 from app.Language.obtain_language import (
     get_content_name_async,
 )
@@ -55,6 +56,8 @@ class LevitationWindow(QWidget):
     DEFAULT_MARGINS = 6  # 贴边隐藏时的最小间距
     DRAG_THRESHOLD = 12  # 拖拽触发阈值，增加阈值避免误识别按钮点击为拖动
     MIN_DRAG_TIME = 100  # 最小拖动识别时间（毫秒），避免极短时间内的移动被识别为拖动
+    _fluent_icon_map = None
+    _fluent_font_family = None
 
     def __init__(self, parent=None):
         """初始化悬浮窗窗口"""
@@ -398,8 +401,7 @@ class LevitationWindow(QWidget):
         return f
 
     def _apply_theme_style(self):
-        # 主题样式应用：深色/浅色配色修正
-        dark = is_dark_theme(qconfig)
+        dark = self._is_floating_window_dark()
         self._container.setAttribute(Qt.WA_StyledBackground, True)
         if dark:
             self._container.setStyleSheet(
@@ -409,6 +411,146 @@ class LevitationWindow(QWidget):
             self._container.setStyleSheet(
                 "background-color: rgba(255,255,255,220); border-radius: 12px; border: 1px solid rgba(0,0,0,12);"
             )
+        try:
+            if hasattr(self, "arrow_button") and self.arrow_button:
+                if dark:
+                    self.arrow_button.setStyleSheet(
+                        f"background-color: rgba(32,32,32,{self._opacity}); color: rgba(255,255,255,200); border-radius: 6px; border: 1px solid rgba(255,255,255,20);"
+                    )
+                else:
+                    self.arrow_button.setStyleSheet(
+                        f"background-color: rgba(255,255,255,{self._opacity}); color: rgba(0,0,0,180); border-radius: 6px; border: 1px solid rgba(0,0,0,12);"
+                    )
+                if int(getattr(self, "_stick_indicator_style", 0) or 0) == 0:
+                    self.arrow_button.setIcon(
+                        self._get_icon_for_floating_window(
+                            "ic_fluent_people_20_filled", self._storage_icon_size
+                        )
+                    )
+                    self.arrow_button.setIconSize(self._storage_icon_size)
+        except Exception:
+            pass
+
+    def _is_floating_window_dark(self) -> bool:
+        idx = int(getattr(self, "_floating_window_theme", 0) or 0)
+        if idx == 0:
+            return is_dark_theme(qconfig)
+        if idx == 1:
+            return False
+        return True
+
+    def _get_icon_for_floating_window(self, icon_name, size: QSize):
+        dark = self._is_floating_window_dark()
+        color = QColor("#ffffff") if dark else QColor("#000000")
+        return self._render_fluent_icon(icon_name, size, color)
+
+    def _ensure_fluent_icon_resources(self):
+        if LevitationWindow._fluent_icon_map is None:
+            try:
+                map_path = get_data_path("assets", "FluentSystemIcons-Filled.json")
+                with open(map_path, "r", encoding="utf-8") as f:
+                    content = f.read()
+                LevitationWindow._fluent_icon_map = (
+                    json.loads(content) if content and content.strip() else {}
+                )
+            except Exception:
+                LevitationWindow._fluent_icon_map = {}
+
+        if LevitationWindow._fluent_font_family is None:
+            try:
+                font_path = get_data_path("assets", "FluentSystemIcons-Filled.ttf")
+                font_id = QFontDatabase.addApplicationFont(str(font_path))
+                if font_id >= 0:
+                    families = QFontDatabase.applicationFontFamilies(font_id)
+                    LevitationWindow._fluent_font_family = (
+                        families[0] if families else ""
+                    )
+                else:
+                    LevitationWindow._fluent_font_family = ""
+            except Exception:
+                LevitationWindow._fluent_font_family = ""
+
+    def _resolve_fluent_char(self, icon_name) -> str:
+        if isinstance(icon_name, str) and icon_name.startswith("\\u"):
+            try:
+                return chr(int(icon_name[2:], 16))
+            except Exception:
+                return chr(DEFAULT_ICON_CODEPOINT)
+
+        if isinstance(icon_name, int):
+            try:
+                return chr(icon_name)
+            except Exception:
+                return chr(DEFAULT_ICON_CODEPOINT)
+
+        if isinstance(icon_name, str):
+            self._ensure_fluent_icon_resources()
+            icon_map = LevitationWindow._fluent_icon_map or {}
+            try:
+                return chr(int(icon_map.get(icon_name, DEFAULT_ICON_CODEPOINT)))
+            except Exception:
+                return chr(DEFAULT_ICON_CODEPOINT)
+
+        return chr(DEFAULT_ICON_CODEPOINT)
+
+    def _render_fluent_icon(self, icon_name, size: QSize, color: QColor) -> QIcon:
+        self._ensure_fluent_icon_resources()
+        font_family = LevitationWindow._fluent_font_family or ""
+        if not font_family:
+            return self._tint_icon(get_theme_icon(icon_name), size, color)
+
+        w = int(size.width()) if size else 24
+        h = int(size.height()) if size else 24
+        w = w if w > 0 else 24
+        h = h if h > 0 else 24
+        px = min(w, h)
+
+        char = self._resolve_fluent_char(icon_name)
+
+        pixmap = QPixmap(w, h)
+        pixmap.fill(Qt.transparent)
+
+        painter = QPainter(pixmap)
+        painter.setRenderHint(QPainter.Antialiasing, True)
+        painter.setRenderHint(QPainter.TextAntialiasing, True)
+        painter.setPen(QPen(color))
+
+        font = QFont(font_family)
+        font.setPixelSize(px)
+        painter.setFont(font)
+        painter.drawText(QRect(0, 0, w, h), Qt.AlignCenter, char)
+        painter.end()
+
+        return QIcon(pixmap)
+
+    def _tint_icon(self, icon: QIcon, size: QSize, color: QColor) -> QIcon:
+        try:
+            qicon = icon.icon() if hasattr(icon, "icon") else icon
+        except Exception:
+            qicon = icon
+
+        w = int(size.width()) if size else 24
+        h = int(size.height()) if size else 24
+        w = w if w > 0 else 24
+        h = h if h > 0 else 24
+
+        try:
+            src = qicon.pixmap(w, h)
+        except Exception:
+            src = QIcon().pixmap(w, h)
+
+        tinted = QPixmap(src.size())
+        tinted.fill(Qt.transparent)
+
+        painter = QPainter(tinted)
+        painter.setRenderHint(QPainter.Antialiasing, True)
+        painter.setCompositionMode(QPainter.CompositionMode_Source)
+        painter.drawPixmap(0, 0, src)
+        painter.setCompositionMode(QPainter.CompositionMode_SourceIn)
+        painter.fillRect(tinted.rect(), color)
+        painter.end()
+
+        return QIcon(tinted)
 
     def _icon_pixmap(self, icon):
         if hasattr(icon, "icon"):
@@ -418,6 +560,21 @@ class LevitationWindow(QWidget):
         else:
             qicon = QIcon()
         return qicon.pixmap(self._icon_size)
+
+    def _freeze_icon(self, icon: QIcon, size: QSize) -> QIcon:
+        try:
+            qicon = icon.icon() if hasattr(icon, "icon") else icon
+        except Exception:
+            qicon = icon
+        try:
+            pixmap = qicon.pixmap(size)
+        except Exception:
+            pixmap = QIcon().pixmap(size)
+        return QIcon(pixmap)
+
+    def _text_color(self) -> str:
+        dark = self._is_floating_window_dark()
+        return "rgba(255,255,255,230)" if dark else "rgba(0,0,0,200)"
 
     def _init_settings(self):
         """初始化设置配置"""
@@ -429,6 +586,9 @@ class LevitationWindow(QWidget):
             "floating_window_management",
             "floating_window_opacity",
             self.DEFAULT_OPACITY,
+        )
+        self._floating_window_theme = self._get_int_setting(
+            "floating_window_management", "floating_window_theme", 0
         )
 
         # 布局设置
@@ -1093,28 +1253,36 @@ class LevitationWindow(QWidget):
         """
         button_configs = {
             "roll_call": {
-                "icon": get_theme_icon("ic_fluent_people_20_filled"),
+                "icon": self._get_icon_for_floating_window(
+                    "ic_fluent_people_20_filled", self._icon_size
+                ),
                 "text": get_content_name_async(
                     "floating_window_management", "roll_call_button"
                 ),
                 "signal": self.rollCallRequested,
             },
             "quick_draw": {
-                "icon": get_theme_icon("ic_fluent_flash_20_filled"),
+                "icon": self._get_icon_for_floating_window(
+                    "ic_fluent_flash_20_filled", self._icon_size
+                ),
                 "text": get_content_name_async(
                     "floating_window_management", "quick_draw_button"
                 ),
                 "signal": self.quickDrawRequested,
             },
             "lottery": {
-                "icon": get_theme_icon("ic_fluent_gift_20_filled"),
+                "icon": self._get_icon_for_floating_window(
+                    "ic_fluent_gift_20_filled", self._icon_size
+                ),
                 "text": get_content_name_async(
                     "floating_window_management", "lottery_button"
                 ),
                 "signal": self.lotteryRequested,
             },
             "timer": {
-                "icon": get_theme_icon("ic_fluent_timer_20_filled"),
+                "icon": self._get_icon_for_floating_window(
+                    "ic_fluent_timer_20_filled", self._icon_size
+                ),
                 "text": get_content_name_async(
                     "floating_window_management", "timer_button"
                 ),
@@ -1124,7 +1292,9 @@ class LevitationWindow(QWidget):
 
         # 默认配置（点名按钮）
         default_config = {
-            "icon": get_theme_icon("ic_fluent_people_20_filled"),
+            "icon": self._get_icon_for_floating_window(
+                "ic_fluent_people_20_filled", self._icon_size
+            ),
             "text": get_content_name_async(
                 "floating_window_management", "roll_call_button"
             ),
@@ -1133,13 +1303,14 @@ class LevitationWindow(QWidget):
 
         return button_configs.get(spec, default_config)
 
-    def _create_icon_only_button(self, icon: QIcon) -> TransparentToolButton:
+    def _create_icon_only_button(self, icon: QIcon) -> QPushButton:
         """创建仅图标按钮"""
-        btn = TransparentToolButton()
-        btn.setIcon(icon)
+        btn = QPushButton()
+        btn.setIcon(self._freeze_icon(icon, self._icon_size))
         btn.setIconSize(self._icon_size)
         btn.setFixedSize(self._btn_size)
         btn.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
+        btn.setFocusPolicy(Qt.NoFocus)
         btn.setAttribute(Qt.WA_TranslucentBackground)
         btn.setStyleSheet("background: transparent; border: none;")
         return btn
@@ -1151,7 +1322,9 @@ class LevitationWindow(QWidget):
         btn.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
         btn.setFont(self._font(self._font_size))
         btn.setAttribute(Qt.WA_TranslucentBackground)
-        btn.setStyleSheet("background: transparent; border: none;")
+        btn.setStyleSheet(
+            f"background: transparent; border: none; color: {self._text_color()};"
+        )
         return btn
 
     def _create_composite_button(self, icon: QIcon, text: str) -> QPushButton:
@@ -1181,17 +1354,15 @@ class LevitationWindow(QWidget):
         btn.setAttribute(Qt.WA_TranslucentBackground)
         return btn
 
-    def _create_icon_label(self, icon: QIcon) -> TransparentToolButton:
+    def _create_icon_label(self, icon: QIcon) -> QLabel:
         """创建图标标签（用于复合按钮）"""
-        label = TransparentToolButton()
-        label.setIcon(icon)
-        label.setIconSize(self._icon_size)
+        label = QLabel()
+        label.setPixmap(
+            self._freeze_icon(icon, self._icon_size).pixmap(self._icon_size)
+        )
         label.setFixedSize(self._icon_size)
-        # 复合按钮图标不置灰，避免低对比；忽略鼠标事件
-        label.setAttribute(Qt.WA_TransparentForMouseEvents, True)  # 忽略鼠标事件
-        label.setFocusPolicy(Qt.NoFocus)  # 无焦点
-        # 标签样式：居中对齐、无背景、无边框
-        label.setStyleSheet("background: transparent; border: none;")
+        label.setAlignment(Qt.AlignCenter)
+        label.setAttribute(Qt.WA_TransparentForMouseEvents, True)
         return label
 
     def _create_text_label(self, text: str) -> BodyLabel:
@@ -1202,7 +1373,9 @@ class LevitationWindow(QWidget):
         label.setAttribute(Qt.WA_TransparentForMouseEvents, True)  # 忽略鼠标事件
         label.setFocusPolicy(Qt.NoFocus)  # 无焦点
         # 标签样式：居中对齐、无背景、无边框
-        label.setStyleSheet("background: transparent; border: none;")
+        label.setStyleSheet(
+            f"background: transparent; border: none; color: {self._text_color()};"
+        )
         return label
 
     def _add_button(self, btn, index, total):
@@ -1954,11 +2127,12 @@ class LevitationWindow(QWidget):
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(0)
 
-        self.arrow_button = TransparentToolButton()
+        self.arrow_button = QPushButton()
         self.arrow_button.setFixedSize(self._storage_btn_size)
         self.arrow_button.setAttribute(Qt.WA_TranslucentBackground)
+        self.arrow_button.setFocusPolicy(Qt.NoFocus)
         # 设置收纳浮窗背景样式，使用主浮窗的透明度
-        dark = is_dark_theme(qconfig)
+        dark = self._is_floating_window_dark()
         if dark:
             self.arrow_button.setStyleSheet(
                 f"background-color: rgba(32,32,32,{self._opacity}); color: rgba(255,255,255,200); border-radius: 6px; border: 1px solid rgba(255,255,255,20);"
@@ -1974,7 +2148,9 @@ class LevitationWindow(QWidget):
             self.arrow_button.setFont(self._font(self._storage_font_size))
         elif self._stick_indicator_style == 0:  # 图标模式
             try:
-                icon = get_theme_icon("ic_fluent_people_20_filled")
+                icon = self._get_icon_for_floating_window(
+                    "ic_fluent_people_20_filled", self._storage_icon_size
+                )
                 self.arrow_button.setIcon(icon)
                 self.arrow_button.setIconSize(self._storage_icon_size)
             except Exception as e:
@@ -2160,6 +2336,9 @@ class LevitationWindow(QWidget):
             elif second == "floating_window_opacity":
                 self._opacity = float(value or 0.8)
                 self.setWindowOpacity(self._opacity)
+            elif second == "floating_window_theme":
+                self._floating_window_theme = int(value or 0)
+                self.rebuild_ui()
             elif second == "floating_window_topmost_mode":
                 mode = int(value or 0)
                 self._topmost_mode = mode
@@ -2300,6 +2479,8 @@ class LevitationWindow(QWidget):
 
     def _on_theme_changed(self):
         """当系统主题变更时调用"""
+        if int(getattr(self, "_floating_window_theme", 0) or 0) == 0:
+            self.rebuild_ui()
         self._apply_theme_style()
 
     def _map_button_control(self, idx):

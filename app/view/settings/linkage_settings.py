@@ -114,6 +114,14 @@ class cses_import_settings(GroupHeaderCardWidget):
             self.on_view_current_config_clicked
         )
 
+        self.clear_cses_schedule_button = PushButton(
+            get_content_name_async("linkage_settings", "clear_cses_schedule")
+        )
+        self.clear_cses_schedule_button.setIcon(
+            get_theme_icon("ic_fluent_delete_20_filled")
+        )
+        self.clear_cses_schedule_button.clicked.connect(self.on_clear_cses_clicked)
+
         # 当前课程表信息标签
         self.schedule_info_label = BodyLabel(
             get_content_name_async("linkage_settings", "no_schedule_imported")
@@ -125,6 +133,7 @@ class cses_import_settings(GroupHeaderCardWidget):
         button_layout.addWidget(self.import_file_button)
         button_layout.addWidget(self.view_current_config_button)
         button_layout.addStretch()
+        button_layout.addWidget(self.clear_cses_schedule_button)
 
         # 创建信息布局
         info_layout = QVBoxLayout()
@@ -184,6 +193,53 @@ class cses_import_settings(GroupHeaderCardWidget):
         except Exception as e:
             logger.exception(f"更新课程表信息失败: {e}")
             self.schedule_info_label.setText("获取课程表信息失败")
+
+    def on_clear_cses_clicked(self):
+        try:
+            cses_dir = get_data_path("CSES")
+            try:
+                ensure_dir(cses_dir)
+            except Exception:
+                pass
+
+            deleted = 0
+            if os.path.exists(cses_dir):
+                for file_name in os.listdir(cses_dir):
+                    if not file_name.endswith((".yaml", ".yml")):
+                        continue
+                    file_path = os.path.join(cses_dir, file_name)
+                    try:
+                        if remove_file(file_path):
+                            deleted += 1
+                    except Exception:
+                        pass
+
+            self._update_schedule_info()
+
+            InfoBar.success(
+                title=get_content_name_async("linkage_settings", "clear_cses_success"),
+                content=get_content_name_async(
+                    "linkage_settings", "clear_cses_success_content"
+                ).format(deleted),
+                orient=Qt.Horizontal,
+                isClosable=True,
+                position=InfoBarPosition.TOP,
+                duration=3000,
+                parent=self,
+            )
+        except Exception as e:
+            logger.exception(f"清除CSES文件失败: {e}")
+            InfoBar.error(
+                title=get_content_name_async("linkage_settings", "clear_cses_failed"),
+                content=get_content_name_async(
+                    "linkage_settings", "clear_cses_failed_content"
+                ).format(str(e)),
+                orient=Qt.Horizontal,
+                isClosable=True,
+                position=InfoBarPosition.TOP,
+                duration=5000,
+                parent=self,
+            )
 
     def on_import_file_clicked(self):
         """当点击导入文件按钮时的处理"""
