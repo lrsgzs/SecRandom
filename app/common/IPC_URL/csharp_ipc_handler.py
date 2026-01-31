@@ -3,7 +3,6 @@ import asyncio
 import threading
 from typing import Optional
 from loguru import logger
-from PySide6.QtCore import QObject, Signal
 
 from app.tools.path_utils import get_data_path
 
@@ -43,7 +42,7 @@ if sys.platform == "win32":
 
 if CSHARP_AVAILABLE:
 
-    class CSharpIPCHandler(QObject):
+    class CSharpIPCHandler:
         """C# dotnetCampus.Ipc 处理器，用于连接 ClassIsland 实例"""
 
         _instance: Optional["CSharpIPCHandler"] = None
@@ -122,7 +121,7 @@ if CSHARP_AVAILABLE:
             draw_count=1,
             settings=None,
             settings_group=None,
-            is_animating=False
+            is_animating=False,
         ) -> bool:
             """发送提醒"""
             if not self.is_running:
@@ -146,8 +145,8 @@ if CSHARP_AVAILABLE:
 
             try:
                 plugin_version = randomService.GetPluginVersion()
-            except:
-                plugin_version = Version.Parse("0.0.0.0")
+            except Exception as e:
+                plugin_version = Version.Parse("0.0.0.1")
 
             logger.debug(f"插件版本为 {plugin_version}")
             if plugin_version < Version.Parse("1.2.0.0"):
@@ -167,15 +166,26 @@ if CSHARP_AVAILABLE:
 
                 return True
 
-            if "roll_call" in settings_group:
-                notification_type = [ResultType.PartialRollCall, ResultType.FinishedRollCall][not is_animating]
+            if settings_group is None:
+                notification_type = ResultType.Unknown
+            elif "roll_call" in settings_group:
+                notification_type = [
+                    ResultType.PartialRollCall,
+                    ResultType.FinishedRollCall,
+                ][not is_animating]
             elif "quick_draw" in settings_group:
-                notification_type = [ResultType.PartialQuickDraw, ResultType.FinishedQuickDraw][not is_animating]
+                notification_type = [
+                    ResultType.PartialQuickDraw,
+                    ResultType.FinishedQuickDraw,
+                ][not is_animating]
             elif "lottery" in settings_group:
-                notification_type = [ResultType.PartialLottery, ResultType.FinishedLottery][not is_animating]
+                notification_type = [
+                    ResultType.PartialLottery,
+                    ResultType.FinishedLottery,
+                ][not is_animating]
             else:
                 notification_type = ResultType.Unknown
-            
+
             logger.debug(f"通知类型: {notification_type}")
 
             data = NotificationData()
@@ -189,7 +199,7 @@ if CSHARP_AVAILABLE:
                 cs_student.StudentName = student[1]
                 cs_student.Exists = student[2]
                 data.Items.Add(cs_student)
-            
+
             randomService.ShowNotification(data)
             return True
 
@@ -425,9 +435,9 @@ if CSHARP_AVAILABLE:
         def check_ci_alive(self) -> bool:
             """ClassIsland 是否正常连接"""
             try:
-                lessonsService = GeneratedIpcFactory.CreateIpcProxy[IPublicLessonsService](
-                    self.ipc_client.Provider, self.ipc_client.PeerProxy
-                )
+                lessonsService = GeneratedIpcFactory.CreateIpcProxy[
+                    IPublicLessonsService
+                ](self.ipc_client.Provider, self.ipc_client.PeerProxy)
                 return lessonsService.IsTimerRunning
             except Exception as e:
                 logger.debug(e)
@@ -491,7 +501,7 @@ else:
             draw_count=1,
             settings=None,
             settings_group=None,
-            is_animating=False
+            is_animating=False,
         ) -> bool:
             """发送提醒"""
             return False
