@@ -24,9 +24,11 @@ from app.tools.path_utils import *
 from app.tools.variable import EXIT_CODE_RESTART, DEFAULT_ICON_CODEPOINT
 from app.Language.obtain_language import (
     get_content_name_async,
+    get_content_combo_name_async,
 )
 from app.common.extraction.extract import _is_non_class_time
 from app.common.safety.verify_ops import require_and_run
+from app.common.data.list import get_class_name_list, get_group_list, get_gender_list
 
 
 class LevitationWindow(QWidget):
@@ -62,6 +64,7 @@ class LevitationWindow(QWidget):
     def __init__(self, parent=None):
         """初始化悬浮窗窗口"""
         super().__init__(parent)
+        self._startup_initial_show = True
 
         # ==================== 基础设置 ====================
         self._setup_window_properties()
@@ -83,8 +86,8 @@ class LevitationWindow(QWidget):
 
         # ==================== 构建UI ====================
         self._build_ui()
-        self._apply_window()
         self._apply_position()
+        self._apply_window()
         self._install_drag_filters()
 
         # ==================== 信号连接 ====================
@@ -95,6 +98,7 @@ class LevitationWindow(QWidget):
 
         # ==================== 启动周期性置顶 ====================
         self._start_periodic_topmost()
+        self._startup_initial_show = False
 
     # ==================== 初始化方法 ====================
 
@@ -150,6 +154,14 @@ class LevitationWindow(QWidget):
         self._disable_quick_draw_timer = QTimer(self)
         self._disable_quick_draw_timer.setSingleShot(True)
         self._disable_quick_draw_timer.timeout.connect(self._enable_quick_draw)
+        self._extend_quick_draw_component = False
+        self._quick_draw_extend_panel = None
+        self._quick_draw_extend_anchor = None
+        self._quick_draw_extend_close_timer = QTimer(self)
+        self._quick_draw_extend_close_timer.setSingleShot(True)
+        self._quick_draw_extend_close_timer.timeout.connect(
+            self._close_quick_draw_extend_panel
+        )
 
     def _init_periodic_topmost_properties(self):
         """初始化周期性置顶相关属性"""
@@ -224,10 +236,15 @@ class LevitationWindow(QWidget):
             return False
 
     def _refresh_window_flags(self):
+        no_focus = bool(getattr(self, "_do_not_steal_focus", False))
+        try:
+            self.setAttribute(Qt.WA_ShowWithoutActivating, no_focus)
+        except Exception:
+            pass
         flags = self._base_window_flags
         if getattr(self, "_topmost_mode", 1) != 0:
             flags |= Qt.WindowStaysOnTopHint
-        if getattr(self, "_do_not_steal_focus", False):
+        if no_focus:
             flags |= Qt.WindowDoesNotAcceptFocus
         self.setWindowFlags(flags)
         if self.isVisible():
@@ -286,6 +303,12 @@ class LevitationWindow(QWidget):
                     arrow_flags |= Qt.WindowStaysOnTopHint
                 if self._do_not_steal_focus:
                     arrow_flags |= Qt.WindowDoesNotAcceptFocus
+                try:
+                    self.arrow_widget.setAttribute(
+                        Qt.WA_ShowWithoutActivating, bool(self._do_not_steal_focus)
+                    )
+                except Exception:
+                    pass
                 self.arrow_widget.setWindowFlags(arrow_flags)
                 if hasattr(self.arrow_widget, "set_keep_on_top_enabled"):
                     self.arrow_widget.set_keep_on_top_enabled(mode != 0)
@@ -341,6 +364,14 @@ class LevitationWindow(QWidget):
         重新构建浮窗UI
         删除当前布局并创建新的布局
         """
+        panel = getattr(self, "_quick_draw_extend_panel", None)
+        if panel is not None:
+            try:
+                panel.close()
+            except Exception:
+                pass
+        self._quick_draw_extend_anchor = None
+
         # 清除现有按钮
         self._clear_buttons()
 
@@ -353,10 +384,19 @@ class LevitationWindow(QWidget):
             QWidget().setLayout(old_layout)  # 从容器中移除旧布局
 
         self._container.setLayout(container_layout)
+        try:
+            self._container.layout().setAlignment(Qt.AlignCenter)
+        except Exception:
+            pass
 
         # 重新添加按钮
         for i, spec in enumerate(self._buttons_spec):
-            btn = self._create_button(spec)
+            if spec == "quick_draw" and bool(
+                getattr(self, "_extend_quick_draw_component", False)
+            ):
+                btn = self._create_extended_quick_draw_widget()
+            else:
+                btn = self._create_button(spec)
             self._add_button(btn, i, len(self._buttons_spec))
 
         self._container.adjustSize()
@@ -601,6 +641,9 @@ class LevitationWindow(QWidget):
             "floating_window_management",
             "floating_window_display_style",
             self.DEFAULT_DISPLAY_STYLE,
+        )
+        self._extend_quick_draw_component = self._get_bool_setting(
+            "floating_window_management", "extend_quick_draw_component", False
         )
 
         # 拖拽设置
@@ -1057,7 +1100,12 @@ class LevitationWindow(QWidget):
         self._container.setLayout(self._container_layout)
         self._container_layout.setAlignment(Qt.AlignCenter)
         for i, spec in enumerate(self._buttons_spec):
-            btn = self._create_button(spec)
+            if spec == "quick_draw" and bool(
+                getattr(self, "_extend_quick_draw_component", False)
+            ):
+                btn = self._create_extended_quick_draw_widget()
+            else:
+                btn = self._create_button(spec)
             self._add_button(btn, i, len(self._buttons_spec))
         self._container.adjustSize()
         self.adjustSize()
@@ -1067,8 +1115,6 @@ class LevitationWindow(QWidget):
         self.setWindowOpacity(self._opacity)
         if self._visible_on_start:
             self.show()
-            # 浮窗显示后立即检测边缘
-            QTimer.singleShot(100, self._check_edge_proximity)
         else:
             self.hide()
 
@@ -1082,6 +1128,9 @@ class LevitationWindow(QWidget):
         if not bool(getattr(self, "_suppress_visibility_tracking", False)):
             self._user_requested_visible = True
         QTimer.singleShot(100, self._check_edge_proximity)
+        if bool(getattr(self, "_startup_initial_show", False)):
+            self._startup_initial_show = False
+            self._schedule_auto_hide(force=False)
         try:
             self._uia_band_applied = False
             self._uia_band_applied_arrow = False
@@ -1100,6 +1149,8 @@ class LevitationWindow(QWidget):
         y = int(readme_settings_async("float_position", "y") or 100)
         nx, ny = self._clamp_to_screen(x, y)
         self.move(nx, ny)
+        if bool(getattr(self, "_stick_to_edge", False)):
+            self._stick_to_nearest_edge()
 
     def _clamp_to_screen(self, x, y):
         fg = self.frameGeometry()
@@ -1107,9 +1158,9 @@ class LevitationWindow(QWidget):
         geo = scr.availableGeometry()
         cx = max(geo.left(), min(x, geo.right() - self.width() + 1))
         cy = max(geo.top(), min(y, geo.bottom() - self.height() + 1))
-        logger.debug(
-            f"_clamp_to_screen: 输入({x}, {y}), 输出({cx}, {cy}), 屏幕区域: {geo}"
-        )
+        # logger.debug(
+        #     f"_clamp_to_screen: 输入({x}, {y}), 输出({cx}, {cy}), 屏幕区域: {geo}"
+        # )
         return cx, cy
 
     def _create_container_layout(self):
@@ -1392,10 +1443,368 @@ class LevitationWindow(QWidget):
         else:
             self._bottom.layout().addWidget(btn, 0, Qt.AlignCenter)
 
+    def _create_extended_quick_draw_widget(self) -> QWidget:
+        quick_draw_btn = self._create_button("quick_draw")
+        arrow_btn = self._create_quick_draw_extend_arrow_button()
+
+        wrapper = QWidget()
+        wrapper.setAttribute(Qt.WA_TranslucentBackground)
+        lay = QHBoxLayout(wrapper)
+        lay.setContentsMargins(0, 0, 0, 0)
+        lay.setSpacing(max(2, int(self._spacing / 2)))
+        lay.setAlignment(Qt.AlignCenter)
+        lay.addWidget(quick_draw_btn)
+        lay.addWidget(arrow_btn)
+
+        return wrapper
+
+    def _create_quick_draw_extend_arrow_button(self) -> QPushButton:
+        btn = QPushButton()
+        btn.setAttribute(Qt.WA_TranslucentBackground)
+        btn.setFocusPolicy(Qt.NoFocus)
+        btn.setStyleSheet("background: transparent; border: none;")
+
+        w = max(20, int(self._btn_size.width() * 0.45))
+        h = int(self._btn_size.height())
+        btn.setFixedSize(QSize(w, h))
+
+        icon_size = QSize(
+            max(14, int(self._icon_size.width() * 0.75)),
+            max(14, int(self._icon_size.height() * 0.75)),
+        )
+        btn.setIcon(
+            self._freeze_icon(
+                self._get_icon_for_floating_window(
+                    "ic_fluent_chevron_down_20_filled", icon_size
+                ),
+                icon_size,
+            )
+        )
+        btn.setIconSize(icon_size)
+        btn.clicked.connect(lambda: self._toggle_quick_draw_extend_panel(btn))
+        return btn
+
+    def _toggle_quick_draw_extend_panel(self, anchor: QWidget) -> None:
+        panel = getattr(self, "_quick_draw_extend_panel", None)
+        if panel is not None and panel.isVisible():
+            self._close_quick_draw_extend_panel()
+            return
+
+        panel = self._ensure_quick_draw_extend_panel()
+        self._quick_draw_extend_anchor = anchor
+        self._populate_quick_draw_extend_panel()
+        self._position_quick_draw_extend_panel(anchor)
+        panel.show()
+        panel.raise_()
+        self._arm_quick_draw_extend_panel_auto_close()
+
+    def _arm_quick_draw_extend_panel_auto_close(self) -> None:
+        timer = getattr(self, "_quick_draw_extend_close_timer", None)
+        if timer is None:
+            return
+        try:
+            if timer.isActive():
+                timer.stop()
+        except Exception:
+            pass
+
+        delay_ms = int(float(getattr(self, "custom_retract_time", 0) or 0) * 1000)
+        if delay_ms <= 0:
+            return
+        try:
+            timer.start(delay_ms)
+        except Exception:
+            pass
+
+    def _close_quick_draw_extend_panel(self) -> None:
+        timer = getattr(self, "_quick_draw_extend_close_timer", None)
+        if timer is not None:
+            try:
+                if timer.isActive():
+                    timer.stop()
+            except Exception:
+                pass
+
+        panel = getattr(self, "_quick_draw_extend_panel", None)
+        if panel is not None:
+            try:
+                if panel.isVisible():
+                    panel.close()
+            except Exception:
+                pass
+        self._quick_draw_extend_anchor = None
+
+    def _ensure_quick_draw_extend_panel(self) -> QWidget:
+        panel = getattr(self, "_quick_draw_extend_panel", None)
+        if panel is not None:
+            try:
+                panel.setParent(None)
+            except Exception:
+                pass
+            try:
+                panel.close()
+            except Exception:
+                pass
+
+        panel = QFrame(None)
+        panel.setWindowFlags(
+            Qt.Popup | Qt.FramelessWindowHint | Qt.NoDropShadowWindowHint
+        )
+        panel.setAttribute(Qt.WA_TranslucentBackground)
+        try:
+            panel.setAttribute(
+                Qt.WA_ShowWithoutActivating,
+                bool(getattr(self, "_do_not_steal_focus", False)),
+            )
+        except Exception:
+            pass
+        try:
+            panel.installEventFilter(self)
+        except Exception:
+            pass
+
+        outer = QVBoxLayout(panel)
+        outer.setContentsMargins(0, 0, 0, 0)
+        outer.setSpacing(0)
+
+        card = QWidget(panel)
+        card.setObjectName("quick_draw_extend_card")
+        card_layout = QVBoxLayout(card)
+        card_layout.setContentsMargins(12, 12, 12, 12)
+        card_layout.setSpacing(8)
+
+        label_font = self._font(max(8, int(self._font_size)))
+
+        class_combo = ComboBox()
+        class_combo.setFont(label_font)
+        class_combo.setFixedHeight(34)
+        class_combo.setMinimumWidth(220)
+        class_combo.setPlaceholderText(
+            get_content_name_async("roll_call", "default_empty_item")
+        )
+
+        range_combo = ComboBox()
+        range_combo.setFont(label_font)
+        range_combo.setFixedHeight(34)
+        range_combo.setMinimumWidth(220)
+
+        gender_combo = ComboBox()
+        gender_combo.setFont(label_font)
+        gender_combo.setFixedHeight(34)
+        gender_combo.setMinimumWidth(220)
+
+        class_combo.currentTextChanged.connect(
+            lambda text: self._on_quick_draw_extend_class_changed(
+                text, range_combo, gender_combo
+            )
+        )
+        range_combo.currentTextChanged.connect(
+            lambda text: update_settings(
+                "floating_window_management", "quick_draw_group_filter", text
+            )
+        )
+        gender_combo.currentTextChanged.connect(
+            lambda text: update_settings(
+                "floating_window_management", "quick_draw_gender_filter", text
+            )
+        )
+
+        card_layout.addWidget(class_combo)
+        card_layout.addWidget(range_combo)
+        card_layout.addWidget(gender_combo)
+
+        outer.addWidget(card)
+
+        self._quick_draw_extend_card = card
+        self._quick_draw_extend_class_combo = class_combo
+        self._quick_draw_extend_range_combo = range_combo
+        self._quick_draw_extend_gender_combo = gender_combo
+        self._quick_draw_extend_panel = panel
+
+        self._apply_quick_draw_extend_panel_style()
+        return panel
+
+    def _apply_quick_draw_extend_panel_style(self) -> None:
+        card = getattr(self, "_quick_draw_extend_card", None)
+        if card is None:
+            return
+
+        dark = self._is_floating_window_dark()
+        if dark:
+            card.setStyleSheet(
+                "background-color: rgba(32,32,32,220); border-radius: 12px; border: 1px solid rgba(255,255,255,24);"
+            )
+        else:
+            card.setStyleSheet(
+                "background-color: rgba(255,255,255,245); border-radius: 12px; border: 1px solid rgba(0,0,0,16);"
+            )
+
+    def _position_quick_draw_extend_panel(self, anchor: QWidget) -> None:
+        panel = getattr(self, "_quick_draw_extend_panel", None)
+        if panel is None:
+            return
+
+        try:
+            anchor_top_left = anchor.mapToGlobal(QPoint(0, 0))
+            anchor_rect = QRect(anchor_top_left, anchor.size())
+        except Exception:
+            p = QCursor.pos()
+            anchor_rect = QRect(p, QSize(1, 1))
+
+        scr = (
+            QGuiApplication.screenAt(anchor_rect.center())
+            or QApplication.primaryScreen()
+        )
+        geo = scr.availableGeometry()
+
+        panel.adjustSize()
+        main_geo = self.frameGeometry()
+        w = int(panel.width())
+        h = int(panel.height())
+
+        candidates = []
+
+        x = main_geo.right() + 6
+        y = anchor_rect.center().y() - int(h / 2)
+        if x + w <= geo.right() + 1:
+            candidates.append((x, y))
+
+        x = anchor_rect.center().x() - int(w / 2)
+        y = main_geo.bottom() + 6
+        if y + h <= geo.bottom() + 1:
+            candidates.append((x, y))
+
+        x = main_geo.left() - w - 6
+        y = anchor_rect.center().y() - int(h / 2)
+        if x >= geo.left():
+            candidates.append((x, y))
+
+        x = anchor_rect.center().x() - int(w / 2)
+        y = main_geo.top() - h - 6
+        if y >= geo.top():
+            candidates.append((x, y))
+
+        if not candidates:
+            x = main_geo.right() + 6
+            y = anchor_rect.center().y() - int(h / 2)
+            candidates.append((x, y))
+
+        x, y = candidates[0]
+        x = max(geo.left(), min(x, geo.right() - w + 1))
+        y = max(geo.top(), min(y, geo.bottom() - h + 1))
+
+        panel.move(x, y)
+
+    def _populate_quick_draw_extend_panel(self) -> None:
+        class_combo = getattr(self, "_quick_draw_extend_class_combo", None)
+        range_combo = getattr(self, "_quick_draw_extend_range_combo", None)
+        gender_combo = getattr(self, "_quick_draw_extend_gender_combo", None)
+        if class_combo is None or range_combo is None or gender_combo is None:
+            return
+
+        class_list = get_class_name_list()
+        saved_class = str(
+            readme_settings_async("floating_window_management", "quick_draw_class_name")
+            or ""
+        )
+
+        class_combo.blockSignals(True)
+        class_combo.clear()
+        class_combo.addItems(class_list)
+        if saved_class and saved_class in class_list:
+            class_combo.setCurrentIndex(class_list.index(saved_class))
+        elif class_list:
+            class_combo.setCurrentIndex(0)
+        class_combo.blockSignals(False)
+
+        current_class = class_combo.currentText() if class_combo.count() > 0 else ""
+        if current_class:
+            update_settings(
+                "floating_window_management", "quick_draw_class_name", current_class
+            )
+
+        self._refresh_quick_draw_extend_filters(
+            current_class, range_combo, gender_combo
+        )
+
+    def _on_quick_draw_extend_class_changed(
+        self, class_name: str, range_combo: ComboBox, gender_combo: ComboBox
+    ) -> None:
+        update_settings(
+            "floating_window_management", "quick_draw_class_name", class_name
+        )
+        self._refresh_quick_draw_extend_filters(class_name, range_combo, gender_combo)
+
+    def _refresh_quick_draw_extend_filters(
+        self, class_name: str, range_combo: ComboBox, gender_combo: ComboBox
+    ) -> None:
+        saved_group_filter = str(
+            readme_settings_async(
+                "floating_window_management", "quick_draw_group_filter"
+            )
+            or ""
+        )
+        saved_gender_filter = str(
+            readme_settings_async(
+                "floating_window_management", "quick_draw_gender_filter"
+            )
+            or ""
+        )
+
+        base_range_options = get_content_combo_name_async("roll_call", "range_combobox")
+        group_list = get_group_list(class_name) if class_name else []
+        range_items = (
+            (base_range_options + group_list)
+            if group_list and group_list != [""]
+            else base_range_options[:1]
+        )
+
+        base_gender_options = get_content_combo_name_async(
+            "roll_call", "gender_combobox"
+        )
+        gender_list = get_gender_list(class_name) if class_name else []
+        gender_items = (
+            (base_gender_options + gender_list)
+            if gender_list and gender_list != [""]
+            else base_gender_options[:1]
+        )
+
+        range_combo.blockSignals(True)
+        range_combo.clear()
+        range_combo.addItems(range_items)
+        if saved_group_filter:
+            idx = range_combo.findText(saved_group_filter)
+            range_combo.setCurrentIndex(idx if idx >= 0 else 0)
+        else:
+            range_combo.setCurrentIndex(0)
+        range_combo.blockSignals(False)
+
+        gender_combo.blockSignals(True)
+        gender_combo.clear()
+        gender_combo.addItems(gender_items)
+        if saved_gender_filter:
+            idx = gender_combo.findText(saved_gender_filter)
+            gender_combo.setCurrentIndex(idx if idx >= 0 else 0)
+        else:
+            gender_combo.setCurrentIndex(0)
+        gender_combo.blockSignals(False)
+
+        update_settings(
+            "floating_window_management",
+            "quick_draw_group_filter",
+            range_combo.currentText() if range_combo.count() > 0 else "",
+        )
+        update_settings(
+            "floating_window_management",
+            "quick_draw_gender_filter",
+            gender_combo.currentText() if gender_combo.count() > 0 else "",
+        )
+
     def mousePressEvent(self, e):
         if e.button() == Qt.LeftButton:
             if not self._draggable:
                 return  # 如果不可拖动，直接返回
+            self._close_quick_draw_extend_panel()
             self._press_pos = e.globalPosition().toPoint()
             self._press_time = int(time.monotonic() * 1000)
             self._dragging = False
@@ -1405,6 +1814,7 @@ class LevitationWindow(QWidget):
     def _begin_drag(self):
         if not self._draggable:
             return
+        self._close_quick_draw_extend_panel()
         self._dragging = True
         self.setCursor(Qt.ClosedHandCursor)
         pass
@@ -1474,6 +1884,12 @@ class LevitationWindow(QWidget):
 
     def eventFilter(self, obj, event):
         """事件过滤器，处理拖拽相关事件"""
+        panel = getattr(self, "_quick_draw_extend_panel", None)
+        if panel is not None and obj is panel:
+            if event.type() in (QEvent.WindowDeactivate, QEvent.Hide, QEvent.Close):
+                QTimer.singleShot(0, self._close_quick_draw_extend_panel)
+            return False
+
         if not self._draggable:
             return False
 
@@ -1492,6 +1908,7 @@ class LevitationWindow(QWidget):
             if not self._draggable:
                 # 如果不可拖动，不启动拖动计时器
                 return False
+            self._close_quick_draw_extend_panel()
             self._press_pos = event.globalPosition().toPoint()
             self._press_time = int(time.monotonic() * 1000)
             self._dragging = False
@@ -1572,22 +1989,32 @@ class LevitationWindow(QWidget):
             delattr(self, "_auto_hide_timer")
 
     def leaveEvent(self, e):
-        # 如果启用了新的贴边隐藏功能，使用新的自动隐藏逻辑
-        if self.floating_window_stick_to_edge:
-            # 如果已经处于收纳状态，不需要额外处理
-            if not self._retracted:
-                # 清除旧的定时器
-                if (
-                    hasattr(self, "_auto_hide_timer")
-                    and self._auto_hide_timer.isActive()
-                ):
-                    self._auto_hide_timer.stop()
-                # 创建或重置自动隐藏定时器
-                self._auto_hide_timer = QTimer(self)
-                self._auto_hide_timer.setSingleShot(True)
-                self._auto_hide_timer.timeout.connect(self._auto_hide_window)
-                # 设置延迟时间
-                self._auto_hide_timer.start(self.custom_retract_time * 1000)
+        self._schedule_auto_hide(force=True)
+
+    def _schedule_auto_hide(self, force: bool = False):
+        if not bool(getattr(self, "floating_window_stick_to_edge", False)):
+            return
+        if bool(getattr(self, "_retracted", False)):
+            return
+        if not self.isVisible():
+            return
+        if not bool(force):
+            try:
+                if self.frameGeometry().contains(QCursor.pos()):
+                    return
+            except Exception:
+                pass
+
+        delay_ms = int(float(getattr(self, "custom_retract_time", 0) or 0) * 1000)
+        if delay_ms <= 0:
+            return
+
+        if hasattr(self, "_auto_hide_timer") and self._auto_hide_timer.isActive():
+            self._auto_hide_timer.stop()
+        self._auto_hide_timer = QTimer(self)
+        self._auto_hide_timer.setSingleShot(True)
+        self._auto_hide_timer.timeout.connect(self._auto_hide_window)
+        self._auto_hide_timer.start(delay_ms)
 
     def _stick_to_nearest_edge(self):
         if not self._stick_to_edge:
@@ -1633,11 +2060,11 @@ class LevitationWindow(QWidget):
         elif self.x() + self.width() > geo.right():
             self.move(geo.right() - self.width() + 1, self.y())
         self._retracted = False
-        logger.debug(f"_expand_from_edge: 窗口位置已展开到 ({self.x()}, {self.y()})")
+        # logger.debug(f"_expand_from_edge: 窗口位置已展开到 ({self.x()}, {self.y()})")
 
     def _check_edge_proximity(self):
         """检测窗口是否靠近屏幕边缘，并实现贴边隐藏功能（带动画效果）"""
-        logger.debug("开始检查边缘贴边隐藏功能")
+        # logger.debug("开始检查边缘贴边隐藏功能")
 
         # 如果有正在进行的动画，先停止它
         if (
@@ -1646,7 +2073,7 @@ class LevitationWindow(QWidget):
         ):
             self.animation.stop()
 
-        logger.debug(f"贴边隐藏功能状态: {self.floating_window_stick_to_edge}")
+        # logger.debug(f"贴边隐藏功能状态: {self.floating_window_stick_to_edge}")
 
         # 如果贴边隐藏功能未启用，直接返回
         if not self.floating_window_stick_to_edge:
@@ -1738,9 +2165,9 @@ class LevitationWindow(QWidget):
 
             # 动画完成后创建收纳浮窗
             def on_animation_finished():
-                logger.debug(
-                    f"贴边隐藏动画完成，选择显示样式: {self._stick_indicator_style}"
-                )
+                # logger.debug(
+                #     f"贴边隐藏动画完成，选择显示样式: {self._stick_indicator_style}"
+                # )
                 # 根据配置选择创建收纳浮窗或箭头按钮
                 self._create_arrow_button(
                     "left",
@@ -2083,6 +2510,8 @@ class LevitationWindow(QWidget):
         """自动隐藏窗口"""
         # 检查是否启用了边缘贴边隐藏功能
         if self.floating_window_stick_to_edge:
+            if bool(getattr(self, "_retracted", False)):
+                return
             # 清除自动隐藏定时器
             if hasattr(self, "_auto_hide_timer") and self._auto_hide_timer.isActive():
                 self._auto_hide_timer.stop()
@@ -2101,9 +2530,9 @@ class LevitationWindow(QWidget):
             self._delete_arrow_button()
 
         # 创建透明的可拖动QWidget作为容器
-        logger.debug(
-            f"创建DraggableWidget箭头按钮，方向: {direction}, 位置: ({x}, {y})"
-        )
+        # logger.debug(
+        #     f"创建DraggableWidget箭头按钮，方向: {direction}, 位置: ({x}, {y})"
+        # )
         self.arrow_widget = DraggableWidget()
         self.arrow_widget.setFixedSize(self._storage_btn_size)
         self.arrow_widget.move(x, y)
@@ -2118,6 +2547,12 @@ class LevitationWindow(QWidget):
             self.arrow_widget.setWindowFlags(
                 self.arrow_widget.windowFlags() | Qt.WindowDoesNotAcceptFocus
             )
+        try:
+            self.arrow_widget.setAttribute(
+                Qt.WA_ShowWithoutActivating, bool(self._do_not_steal_focus)
+            )
+        except Exception:
+            pass
 
         # 设置容器透明
         self.arrow_widget.setAttribute(Qt.WA_TranslucentBackground)
@@ -2202,7 +2637,7 @@ class LevitationWindow(QWidget):
         # 确保容器显示在最前面
         self.arrow_widget.raise_()
         self.arrow_widget.show()
-        logger.debug(f"DraggableWidget箭头按钮已显示，位置: {self.arrow_widget.pos()}")
+        # logger.debug(f"DraggableWidget箭头按钮已显示，位置: {self.arrow_widget.pos()}")
 
         # 将arrow_widget赋值给storage_window，供其他地方使用
         self.storage_window = self.arrow_widget
@@ -2210,9 +2645,9 @@ class LevitationWindow(QWidget):
 
     def _show_hidden_window(self, direction):
         """显示隐藏的窗口（带动画效果）"""
-        logger.debug(
-            f"_show_hidden_window: 方向={direction}, 当前窗口位置=({self.x()}, {self.y()})"
-        )
+        # logger.debug(
+        #     f"_show_hidden_window: 方向={direction}, 当前窗口位置=({self.x()}, {self.y()})"
+        # )
 
         # 如果有正在进行的动画，先停止它
         if (
@@ -2223,7 +2658,7 @@ class LevitationWindow(QWidget):
 
         # 获取屏幕尺寸
         screen = QApplication.primaryScreen().availableGeometry()
-        logger.debug(f"_show_hidden_window: 屏幕区域={screen}")
+        # logger.debug(f"_show_hidden_window: 屏幕区域={screen}")
 
         # 获取窗口当前位置和尺寸
         window_width = self.width()
@@ -2269,11 +2704,31 @@ class LevitationWindow(QWidget):
 
         self.animation.setEndValue(end_rect)
 
+        def on_animation_finished():
+            self._retracted = False
+            self.raise_()
+
+            delay_ms = int(float(getattr(self, "custom_retract_time", 0) or 0) * 1000)
+            if delay_ms <= 0:
+                return
+
+            if hasattr(self, "_auto_hide_timer") and self._auto_hide_timer.isActive():
+                self._auto_hide_timer.stop()
+            self._auto_hide_timer = QTimer(self)
+            self._auto_hide_timer.setSingleShot(True)
+            self._auto_hide_timer.timeout.connect(self._auto_hide_window)
+            self._auto_hide_timer.start(delay_ms)
+
+        try:
+            self.animation.finished.connect(on_animation_finished)
+        except Exception:
+            pass
+
         # 启动动画
         self.animation.start()
-        logger.debug(
-            f"_show_hidden_window: 动画已启动，目标位置=({end_rect.x()}, {end_rect.y()})"
-        )
+        # logger.debug(
+        #     f"_show_hidden_window: 动画已启动，目标位置=({end_rect.x()}, {end_rect.y()})"
+        # )
 
         # 删除箭头按钮
         self._delete_arrow_button()
@@ -2282,10 +2737,6 @@ class LevitationWindow(QWidget):
 
         # 将窗口提升到最前面，但不激活窗口
         self.raise_()
-
-        # 根据自定义收回秒数设置延迟后自动隐藏窗口
-        retract_time = self.custom_retract_time * 1000  # 转换为毫秒
-        QTimer.singleShot(retract_time, self._auto_hide_window)
 
     def _delete_arrow_button(self):
         """删除箭头按钮"""
@@ -2333,6 +2784,15 @@ class LevitationWindow(QWidget):
                 else:
                     self.hide()
                 self.visibilityChanged.emit(bool(value))
+            elif second == "extend_quick_draw_component":
+                self._extend_quick_draw_component = bool(value)
+                panel = getattr(self, "_quick_draw_extend_panel", None)
+                if panel is not None:
+                    try:
+                        panel.close()
+                    except Exception:
+                        pass
+                self.rebuild_ui()
             elif second == "floating_window_opacity":
                 self._opacity = float(value or 0.8)
                 self.setWindowOpacity(self._opacity)

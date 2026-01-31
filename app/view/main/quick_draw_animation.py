@@ -45,13 +45,75 @@ class QuickDrawAnimation(QObject):
     def _get_default_filters(self):
         class_name = readme_settings_async("quick_draw_settings", "default_class")
         group_index = 0
-        group_filter = get_content_combo_name_async("roll_call", "range_combobox")[
-            group_index
-        ]
         gender_index = 0
-        gender_filter = get_content_combo_name_async("roll_call", "gender_combobox")[
-            gender_index
-        ]
+
+        try:
+            extend_enabled = bool(
+                readme_settings_async(
+                    "floating_window_management", "extend_quick_draw_component"
+                )
+            )
+        except Exception:
+            extend_enabled = False
+
+        if extend_enabled:
+            saved_class_name = str(
+                readme_settings_async(
+                    "floating_window_management", "quick_draw_class_name"
+                )
+                or ""
+            )
+            if saved_class_name and saved_class_name in get_class_name_list():
+                class_name = saved_class_name
+
+        base_group_items = get_content_combo_name_async("roll_call", "range_combobox")
+        group_items = base_group_items
+        if class_name:
+            group_list = get_group_list(class_name)
+            group_items = (
+                base_group_items + group_list
+                if group_list and group_list != [""]
+                else base_group_items[:1]
+            )
+        else:
+            group_items = base_group_items[:1]
+
+        group_filter = group_items[0] if group_items else ""
+        if extend_enabled:
+            saved_group_filter = str(
+                readme_settings_async(
+                    "floating_window_management", "quick_draw_group_filter"
+                )
+                or ""
+            )
+            if saved_group_filter and saved_group_filter in group_items:
+                group_index = group_items.index(saved_group_filter)
+                group_filter = saved_group_filter
+
+        base_gender_items = get_content_combo_name_async("roll_call", "gender_combobox")
+        gender_items = base_gender_items
+        if class_name:
+            gender_list = get_gender_list(class_name)
+            gender_items = (
+                base_gender_items + gender_list
+                if gender_list and gender_list != [""]
+                else base_gender_items[:1]
+            )
+        else:
+            gender_items = base_gender_items[:1]
+
+        gender_filter = gender_items[0] if gender_items else ""
+        if extend_enabled:
+            saved_gender_filter = str(
+                readme_settings_async(
+                    "floating_window_management", "quick_draw_gender_filter"
+                )
+                or ""
+            )
+            if saved_gender_filter and saved_gender_filter in gender_items:
+                gender_index = gender_items.index(saved_gender_filter)
+                gender_filter = saved_gender_filter
+
         return class_name, group_index, group_filter, gender_index, gender_filter
 
     def _build_selected_students(self, students):

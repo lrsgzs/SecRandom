@@ -31,18 +31,6 @@ floating_window_management = {
             "description": "在浮窗闪抽按钮旁显示更多选择控件",
             "switchbutton_name": {"enable": "", "disable": ""},
         },
-        "quick_draw_extend_class_label": {
-            "name": "抽取名单",
-            "description": "选择闪抽抽取的名单",
-        },
-        "quick_draw_extend_range_label": {
-            "name": "小组范围",
-            "description": "选择闪抽抽取的小组范围",
-        },
-        "quick_draw_extend_gender_label": {
-            "name": "性别范围",
-            "description": "选择闪抽抽取的性别范围",
-        },
         "uia_topmost_restart_dialog_title": {
             "name": "需要重启",
             "description": "UIA置顶切换后重启提示标题",
@@ -204,18 +192,6 @@ floating_window_management = {
             "name": "Extended Quick Pick controls",
             "description": "Show extra selectors next to the floating window Quick Pick button",
             "switchbutton_name": {"enable": "", "disable": ""},
-        },
-        "quick_draw_extend_class_label": {
-            "name": "Class list",
-            "description": "Select the class list used by Quick Pick",
-        },
-        "quick_draw_extend_range_label": {
-            "name": "Group filter",
-            "description": "Select the group filter used by Quick Pick",
-        },
-        "quick_draw_extend_gender_label": {
-            "name": "Gender filter",
-            "description": "Select the gender filter used by Quick Pick",
         },
         "uia_topmost_restart_dialog_title": {
             "name": "Restart Required",

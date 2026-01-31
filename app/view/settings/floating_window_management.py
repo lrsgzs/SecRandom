@@ -217,6 +217,28 @@ class floating_window_basic_settings(GroupHeaderCardWidget):
             )
         )
 
+        self.extend_quick_draw_component_switch = SwitchButton()
+        self.extend_quick_draw_component_switch.setOffText(
+            get_content_switchbutton_name_async(
+                "floating_window_management", "extend_quick_draw_component", "disable"
+            )
+        )
+        self.extend_quick_draw_component_switch.setOnText(
+            get_content_switchbutton_name_async(
+                "floating_window_management", "extend_quick_draw_component", "enable"
+            )
+        )
+        self.extend_quick_draw_component_switch.setChecked(
+            readme_settings_async(
+                "floating_window_management", "extend_quick_draw_component"
+            )
+        )
+        self.extend_quick_draw_component_switch.checkedChanged.connect(
+            lambda checked: update_settings(
+                "floating_window_management", "extend_quick_draw_component", checked
+            )
+        )
+
         # 添加设置项到分组
         self.addGroup(
             get_theme_icon("ic_fluent_desktop_sync_20_filled"),
@@ -275,6 +297,16 @@ class floating_window_basic_settings(GroupHeaderCardWidget):
                 "floating_window_management", "do_not_steal_focus"
             ),
             self.do_not_steal_focus_switch,
+        )
+        self.addGroup(
+            get_theme_icon("ic_fluent_panel_right_20_filled"),
+            get_content_name_async(
+                "floating_window_management", "extend_quick_draw_component"
+            ),
+            get_content_description_async(
+                "floating_window_management", "extend_quick_draw_component"
+            ),
+            self.extend_quick_draw_component_switch,
         )
         self.addGroup(
             get_theme_icon("ic_fluent_arrow_reset_20_filled"),
