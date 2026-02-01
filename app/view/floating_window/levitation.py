@@ -65,6 +65,8 @@ class LevitationWindow(QWidget):
         """初始化悬浮窗窗口"""
         super().__init__(parent)
         self._startup_initial_show = True
+        self._close_guard_enabled = True
+        self._close_guard_last_log_ms = 0
 
         # ==================== 基础设置 ====================
         self._setup_window_properties()
@@ -1143,6 +1145,35 @@ class LevitationWindow(QWidget):
         if not bool(getattr(self, "_suppress_visibility_tracking", False)):
             self._user_requested_visible = False
         self._apply_topmost_runtime()
+
+    def closeEvent(self, event):
+        try:
+            if (
+                bool(getattr(self, "_close_guard_enabled", False))
+                and not QApplication.instance().closingDown()
+            ):
+                try:
+                    event.ignore()
+                except Exception:
+                    pass
+                now_ms = int(QDateTime.currentMSecsSinceEpoch() or 0)
+                if (
+                    now_ms - int(getattr(self, "_close_guard_last_log_ms", 0) or 0)
+                    >= 5000
+                ):
+                    self._close_guard_last_log_ms = now_ms
+                    logger.warning("检测到外部关闭请求，已阻止关闭浮窗")
+                try:
+                    if self.isMinimized():
+                        self.showNormal()
+                    self.show()
+                    self.raise_()
+                except Exception:
+                    pass
+                return
+        except Exception:
+            pass
+        return super().closeEvent(event)
 
     def _apply_position(self):
         x = int(readme_settings_async("float_position", "x") or 100)
