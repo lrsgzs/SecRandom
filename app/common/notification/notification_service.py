@@ -1053,27 +1053,6 @@ class FloatingNotificationManager:
                         }
                     )
             else:
-                student_group_by_id = {}
-                student_group_by_name = {}
-                try:
-                    from app.common.data.list import get_student_list
-
-                    for student in get_student_list(class_name) or []:
-                        if not isinstance(student, dict):
-                            continue
-                        sid = student.get("id", 0)
-                        sname = str(student.get("name", "") or "")
-                        sgroup = str(student.get("group", "") or "")
-                        try:
-                            student_group_by_id[int(sid or 0)] = sgroup
-                        except Exception:
-                            pass
-                        if sname:
-                            student_group_by_name[sname] = sgroup
-                except Exception:
-                    student_group_by_id = {}
-                    student_group_by_name = {}
-
                 selected_students_for_ipc = []
                 for item in selected_students or []:
                     if not isinstance(item, (list, tuple)) or len(item) < 3:
